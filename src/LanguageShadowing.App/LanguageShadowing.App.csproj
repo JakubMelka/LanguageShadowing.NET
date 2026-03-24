@@ -1,0 +1,28 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks>net9.0-windows10.0.19041.0;net9.0-maccatalyst</TargetFrameworks>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>LanguageShadowing.App</RootNamespace>
+    <UseMaui>true</UseMaui>
+    <SingleProject>true</SingleProject>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <ApplicationTitle>Language Shadowing</ApplicationTitle>
+    <ApplicationId>com.melkaj.languageshadowing</ApplicationId>
+    <ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>
+    <ApplicationVersion>1</ApplicationVersion>
+    <WindowsPackageType>None</WindowsPackageType>
+    <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.19041.0</SupportedOSPlatformVersion>
+    <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'maccatalyst'">15.0</SupportedOSPlatformVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <MauiXaml Update="**\*.xaml" Generator="MSBuild:Compile" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\LanguageShadowing.Core\LanguageShadowing.Core.csproj" />
+    <ProjectReference Include="..\LanguageShadowing.Application\LanguageShadowing.Application.csproj" />
+    <ProjectReference Include="..\LanguageShadowing.Infrastructure\LanguageShadowing.Infrastructure.csproj" />
+  </ItemGroup>
+</Project>

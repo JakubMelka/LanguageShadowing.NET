@@ -1,0 +1,112 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:viewModels="clr-namespace:LanguageShadowing.Application.ViewModels;assembly=LanguageShadowing.Application"
+             xmlns:controls="clr-namespace:LanguageShadowing.App.Controls"
+             xmlns:converters="clr-namespace:LanguageShadowing.App.Converters"
+             x:Class="LanguageShadowing.App.MainPage"
+             x:DataType="viewModels:MainViewModel"
+             Title="Language Shadowing">
+    <ContentPage.Resources>
+        <converters:HexToColorConverter x:Key="HexToColorConverter" />
+    </ContentPage.Resources>
+
+    <ScrollView>
+        <VerticalStackLayout Padding="24" Spacing="0" MaximumWidthRequest="1080">
+            <Border Style="{StaticResource CardBorderStyle}">
+                <Grid ColumnDefinitions="2*,1.2*,Auto" ColumnSpacing="16" RowDefinitions="Auto,Auto">
+                    <VerticalStackLayout Grid.RowSpan="2" Spacing="6">
+                        <Label Text="Voice" FontAttributes="Bold" />
+                        <Picker ItemsSource="{Binding Voices}"
+                                SelectedItem="{Binding SelectedVoice}"
+                                ItemDisplayBinding="{Binding DisplayName}"
+                                Title="Vyber hlas" />
+                    </VerticalStackLayout>
+
+                    <VerticalStackLayout Grid.Column="1" Spacing="6">
+                        <Label Text="Speech rate" FontAttributes="Bold" />
+                        <Slider Minimum="0.5" Maximum="2" Value="{Binding SpeechRate}" />
+                    </VerticalStackLayout>
+
+                    <Border Grid.Column="2"
+                            Padding="12,8"
+                            BackgroundColor="{StaticResource SurfaceMuted}"
+                            StrokeThickness="0"
+                            VerticalOptions="End">
+                        <Label Text="{Binding SpeechRateDisplay}" FontAttributes="Bold" />
+                    </Border>
+
+                    <Label Grid.Column="1"
+                           Grid.Row="1"
+                           Text="{Binding RecognitionAvailabilityText}"
+                           TextColor="{StaticResource SecondaryText}"
+                           FontSize="12" />
+                </Grid>
+            </Border>
+
+            <Border Style="{StaticResource CardBorderStyle}">
+                <VerticalStackLayout>
+                    <Label Text="Source text" FontAttributes="Bold" FontSize="18" />
+                    <Label Text="Sem vlož text, který se bude číst syntetickým hlasem." TextColor="{StaticResource SecondaryText}" />
+                    <Editor Text="{Binding SourceText}" HeightRequest="220" Placeholder="Např. Today I am practicing pronunciation by shadowing each sentence." />
+                </VerticalStackLayout>
+            </Border>
+
+            <Border Style="{StaticResource CardBorderStyle}">
+                <VerticalStackLayout Spacing="16">
+                    <Grid ColumnDefinitions="Auto,Auto,Auto,Auto,Auto,*" ColumnSpacing="10">
+                        <Button Text="Reset" Command="{Binding ResetCommand}" />
+                        <Button Grid.Column="1" Text="Pause" Command="{Binding PauseCommand}" />
+                        <Button Grid.Column="2" Text="Play" Command="{Binding PlayCommand}" BackgroundColor="{StaticResource AccentColor}" TextColor="White" />
+                        <Button Grid.Column="3" Text="Stop" Command="{Binding StopCommand}" />
+                        <Button Grid.Column="4" Text="Rewind" Command="{Binding RewindCommand}" />
+                    </Grid>
+
+                    <Grid RowDefinitions="Auto,Auto,Auto" RowSpacing="8">
+                        <controls:WaveformView Grid.Row="0"
+                                               Samples="{Binding WaveformSamples}"
+                                               Progress="{Binding ProgressRatio}" />
+                        <Slider x:Name="ProgressSlider"
+                                Grid.Row="0"
+                                Margin="8,0"
+                                Minimum="0"
+                                Maximum="{Binding ProgressMaximum}"
+                                Value="{Binding PositionSeconds, Mode=OneWay}"
+                                DragCompleted="OnProgressDragCompleted"
+                                BackgroundColor="Transparent" />
+                        <Grid Grid.Row="1" ColumnDefinitions="Auto,*,Auto">
+                            <Label Text="{Binding PositionText}" TextColor="{StaticResource SecondaryText}" />
+                            <BoxView Grid.Column="1" BackgroundColor="Transparent" />
+                            <Label Grid.Column="2" Text="{Binding DurationText}" TextColor="{StaticResource SecondaryText}" />
+                        </Grid>
+                        <Label Grid.Row="2"
+                               Text="{Binding StatusMessage}"
+                               TextColor="{StaticResource SecondaryText}"
+                               FontSize="12" />
+                    </Grid>
+                </VerticalStackLayout>
+            </Border>
+
+            <Border Style="{StaticResource CardBorderStyle}">
+                <VerticalStackLayout Spacing="14">
+                    <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="12">
+                        <Label Text="Recognized transcript" FontAttributes="Bold" FontSize="18" />
+                        <Border Grid.Column="1"
+                                Padding="14,8"
+                                BackgroundColor="{Binding ScoreColorHex, Converter={StaticResource HexToColorConverter}}"
+                                StrokeThickness="0">
+                            <Border.StrokeShape>
+                                <RoundRectangle CornerRadius="14" />
+                            </Border.StrokeShape>
+                            <Label Text="{Binding ScoreText}" TextColor="White" FontAttributes="Bold" />
+                        </Border>
+                        <Button Grid.Column="2" Text="Clear" Command="{Binding ClearRecognizedCommand}" />
+                    </Grid>
+
+                    <Editor Text="{Binding RecognizedText}" IsReadOnly="True" HeightRequest="180" Placeholder="Mikrofon bude průběžně doplňovat rozpoznaný text." />
+                    <Label Text="{Binding ShadowingSummary}" TextColor="{StaticResource SecondaryText}" />
+                </VerticalStackLayout>
+            </Border>
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>
