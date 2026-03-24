@@ -1,11 +1,22 @@
-﻿namespace LanguageShadowing.App;
+﻿using LanguageShadowing.Application.Common;
+using Microsoft.Extensions.DependencyInjection;
 
-public partial class App : Application
+namespace LanguageShadowing.App;
+
+public partial class App : Microsoft.Maui.Controls.Application
 {
-    public App(MainPage mainPage)
+    private readonly IServiceProvider _serviceProvider;
+
+    public App(IServiceProvider serviceProvider)
     {
         InitializeComponent();
-        MainPage = new NavigationPage(mainPage);
+        _serviceProvider = serviceProvider;
+        UiThread.Initialize(SynchronizationContext.Current);
+    }
+
+    protected override Window CreateWindow(IActivationState? activationState)
+    {
+        var mainPage = _serviceProvider.GetRequiredService<MainPage>();
+        return new Window(new Microsoft.Maui.Controls.NavigationPage(mainPage));
     }
 }
-

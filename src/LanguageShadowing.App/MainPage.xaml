@@ -20,7 +20,7 @@
                         <Picker ItemsSource="{Binding Voices}"
                                 SelectedItem="{Binding SelectedVoice}"
                                 ItemDisplayBinding="{Binding DisplayName}"
-                                Title="Vyber hlas" />
+                                Title="Choose a voice" />
                     </VerticalStackLayout>
 
                     <VerticalStackLayout Grid.Column="1" Spacing="6">
@@ -47,8 +47,8 @@
             <Border Style="{StaticResource CardBorderStyle}">
                 <VerticalStackLayout>
                     <Label Text="Source text" FontAttributes="Bold" FontSize="18" />
-                    <Label Text="Sem vlož text, který se bude číst syntetickým hlasem." TextColor="{StaticResource SecondaryText}" />
-                    <Editor Text="{Binding SourceText}" HeightRequest="220" Placeholder="Např. Today I am practicing pronunciation by shadowing each sentence." />
+                    <Label Text="Enter the text that should be spoken by the selected voice." TextColor="{StaticResource SecondaryText}" />
+                    <Editor Text="{Binding SourceText}" HeightRequest="220" Placeholder="For example: Today I am practicing pronunciation by shadowing each sentence." />
                 </VerticalStackLayout>
             </Border>
 
@@ -103,10 +103,11 @@
                         <Button Grid.Column="2" Text="Clear" Command="{Binding ClearRecognizedCommand}" />
                     </Grid>
 
-                    <Editor Text="{Binding RecognizedText}" IsReadOnly="True" HeightRequest="180" Placeholder="Mikrofon bude průběžně doplňovat rozpoznaný text." />
+                    <Editor Text="{Binding RecognizedText}" IsReadOnly="True" HeightRequest="180" Placeholder="The microphone will continuously append recognized text." />
                     <Label Text="{Binding ShadowingSummary}" TextColor="{StaticResource SecondaryText}" />
                 </VerticalStackLayout>
             </Border>
         </VerticalStackLayout>
     </ScrollView>
 </ContentPage>
+

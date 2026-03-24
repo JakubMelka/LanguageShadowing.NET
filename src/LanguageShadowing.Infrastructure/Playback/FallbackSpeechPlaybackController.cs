@@ -32,7 +32,7 @@ public sealed class FallbackSpeechPlaybackController : IAudioPlaybackController
         {
             if (_loaded is null || _loaded.Segments.Count == 0)
             {
-                Publish(new PlaybackState(PlaybackStatus.Error, TimeSpan.Zero, TimeSpan.Zero, false, false, "Neni pripraven zadny audio plan."));
+                Publish(new PlaybackState(PlaybackStatus.Error, TimeSpan.Zero, TimeSpan.Zero, false, false, "No audio plan is prepared."));
                 return;
             }
 
@@ -43,7 +43,7 @@ public sealed class FallbackSpeechPlaybackController : IAudioPlaybackController
 
             _playbackCts?.Cancel();
             _playbackCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            Publish(_state with { Status = PlaybackStatus.Playing, IsBusy = true, Message = "Prehravam v odhadovanem fallback rezimu." });
+            Publish(_state with { Status = PlaybackStatus.Playing, IsBusy = true, Message = "Playing in estimated fallback mode." });
             _ = RunPlaybackAsync(_loaded, _playbackCts.Token);
         }
         finally
@@ -55,7 +55,7 @@ public sealed class FallbackSpeechPlaybackController : IAudioPlaybackController
     public Task PauseAsync(CancellationToken cancellationToken = default)
     {
         _playbackCts?.Cancel();
-        Publish(_state with { Status = PlaybackStatus.Paused, IsBusy = false, Message = "Pause se vraci na zacatek aktualni vety." });
+        Publish(_state with { Status = PlaybackStatus.Paused, IsBusy = false, Message = "Pause returns to the start of the current sentence in fallback mode." });
         return Task.CompletedTask;
     }
 
@@ -63,7 +63,7 @@ public sealed class FallbackSpeechPlaybackController : IAudioPlaybackController
     {
         _playbackCts?.Cancel();
         _currentSegmentIndex = 0;
-        Publish(_state with { Status = PlaybackStatus.Stopped, Position = TimeSpan.Zero, IsBusy = false, Message = "Prehravani zastaveno." });
+        Publish(_state with { Status = PlaybackStatus.Stopped, Position = TimeSpan.Zero, IsBusy = false, Message = "Playback stopped." });
         return Task.CompletedTask;
     }
 
@@ -90,7 +90,7 @@ public sealed class FallbackSpeechPlaybackController : IAudioPlaybackController
             .LastOrDefault(entry => entry.segment.Start <= position)?.index ?? 0);
 
         var segment = _loaded.Segments[_currentSegmentIndex];
-        Publish(_state with { Position = segment.Start, Message = "Seek ve fallback rezimu preskakuje po vetach." });
+        Publish(_state with { Position = segment.Start, Message = "Seek snaps to sentence boundaries in fallback mode." });
 
         if (wasPlaying)
         {
@@ -110,7 +110,7 @@ public sealed class FallbackSpeechPlaybackController : IAudioPlaybackController
     {
         try
         {
-            var options = await CreateSpeechOptionsAsync(result.Request.Voice?.Locale, result.Request.Rate).ConfigureAwait(false);
+            var options = await CreateSpeechOptionsAsync(result.Request.Voice?.Locale).ConfigureAwait(false);
             for (; _currentSegmentIndex < result.Segments.Count; _currentSegmentIndex++)
             {
                 var segment = result.Segments[_currentSegmentIndex];
@@ -119,7 +119,7 @@ public sealed class FallbackSpeechPlaybackController : IAudioPlaybackController
                 Publish(_state with { Status = PlaybackStatus.Playing, Position = segment.Start + segment.Duration, Duration = result.Duration, IsBusy = true });
             }
 
-            Publish(_state with { Status = PlaybackStatus.Completed, Position = result.Duration, Duration = result.Duration, IsBusy = false, Message = "Prehravani dokonceno." });
+            Publish(_state with { Status = PlaybackStatus.Completed, Position = result.Duration, Duration = result.Duration, IsBusy = false, Message = "Playback completed." });
             _currentSegmentIndex = 0;
         }
         catch (OperationCanceledException)
@@ -131,11 +131,10 @@ public sealed class FallbackSpeechPlaybackController : IAudioPlaybackController
         }
     }
 
-    private static async Task<SpeechOptions> CreateSpeechOptionsAsync(string? localeCode, double rate)
+    private static async Task<SpeechOptions> CreateSpeechOptionsAsync(string? localeCode)
     {
         var options = new SpeechOptions
         {
-            Rate = (float)Math.Clamp(rate, 0.1, 2.0),
             Pitch = 1f,
             Volume = 1f
         };
@@ -164,3 +163,4 @@ public sealed class FallbackSpeechPlaybackController : IAudioPlaybackController
         StateChanged?.Invoke(this, new PlaybackStateChangedEventArgs(state));
     }
 }
+

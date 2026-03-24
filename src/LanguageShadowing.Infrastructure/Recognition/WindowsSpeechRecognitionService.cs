@@ -24,11 +24,11 @@ public sealed class WindowsSpeechRecognitionService : ISpeechRecognitionService
 
     public async Task StartAsync(CancellationToken cancellationToken = default)
     {
-        PublishState(RecognitionStatus.Starting, "Zadost o mikrofon a inicializace STT...");
+        PublishState(RecognitionStatus.Starting, "Requesting microphone access and initializing speech recognition...");
         var permission = await Permissions.RequestAsync<Permissions.Microphone>();
         if (permission != PermissionStatus.Granted)
         {
-            PublishState(RecognitionStatus.Error, "Pristup k mikrofonu nebyl povolen.");
+            PublishState(RecognitionStatus.Error, "Microphone access was denied.");
             return;
         }
 
@@ -41,7 +41,7 @@ public sealed class WindowsSpeechRecognitionService : ISpeechRecognitionService
         if (_recognizer.State == SpeechRecognizerState.Idle)
         {
             await _recognizer.ContinuousRecognitionSession.StartAsync().AsTask(cancellationToken).ConfigureAwait(false);
-            PublishState(RecognitionStatus.Listening, "Mikrofon nasloucha.");
+            PublishState(RecognitionStatus.Listening, "Microphone is listening.");
         }
     }
 
@@ -49,11 +49,11 @@ public sealed class WindowsSpeechRecognitionService : ISpeechRecognitionService
     {
         if (_recognizer is not null && _recognizer.State != SpeechRecognizerState.Idle)
         {
-            PublishState(RecognitionStatus.Stopping, "Zastavuji rozpoznavani...");
+            PublishState(RecognitionStatus.Stopping, "Stopping recognition...");
             await _recognizer.ContinuousRecognitionSession.StopAsync().AsTask(cancellationToken).ConfigureAwait(false);
         }
 
-        PublishState(RecognitionStatus.Completed, "Rozpoznavani zastaveno.");
+        PublishState(RecognitionStatus.Completed, "Recognition stopped.");
     }
 
     public async Task ResetAsync(CancellationToken cancellationToken = default)
@@ -66,7 +66,7 @@ public sealed class WindowsSpeechRecognitionService : ISpeechRecognitionService
         _committedText.Clear();
         _hypothesis = string.Empty;
         RecognitionUpdated?.Invoke(this, new RecognitionUpdatedEventArgs(new RecognitionUpdate(string.Empty, string.Empty, true)));
-        PublishState(RecognitionStatus.Idle, "Prepis byl vycisten.");
+        PublishState(RecognitionStatus.Idle, "Transcript cleared.");
     }
 
     public async ValueTask DisposeAsync()
@@ -100,7 +100,7 @@ public sealed class WindowsSpeechRecognitionService : ISpeechRecognitionService
         var compilation = await _recognizer.CompileConstraintsAsync();
         if (compilation.Status != SpeechRecognitionResultStatus.Success)
         {
-            PublishState(RecognitionStatus.Error, $"Nepodarilo se pripravit STT: {compilation.Status}.");
+            PublishState(RecognitionStatus.Error, $"Could not prepare speech recognition: {compilation.Status}.");
             _recognizer.Dispose();
             _recognizer = null;
         }
@@ -133,8 +133,8 @@ public sealed class WindowsSpeechRecognitionService : ISpeechRecognitionService
     private void OnCompleted(SpeechContinuousRecognitionSession sender, SpeechContinuousRecognitionCompletedEventArgs args)
     {
         PublishState(RecognitionStatus.Completed, args.Status == SpeechRecognitionResultStatus.Success
-            ? "Rozpoznavani dokonceno."
-            : $"Rozpoznavani skoncilo se stavem {args.Status}.");
+            ? "Recognition completed."
+            : $"Recognition ended with status {args.Status}.");
     }
 
     private void PublishRecognition(string latestText, bool isFinal, double? confidence)
@@ -153,3 +153,4 @@ public sealed class WindowsSpeechRecognitionService : ISpeechRecognitionService
     }
 }
 #endif
+

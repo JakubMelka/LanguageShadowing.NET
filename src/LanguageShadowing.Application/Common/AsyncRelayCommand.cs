@@ -39,5 +39,8 @@ public sealed class AsyncRelayCommand : ICommand
         }
     }
 
-    public void NotifyCanExecuteChanged() => CanExecuteChanged?.Invoke(this, EventArgs.Empty);
+    public void NotifyCanExecuteChanged()
+    {
+        UiThread.Post(() => CanExecuteChanged?.Invoke(this, EventArgs.Empty));
+    }
 }

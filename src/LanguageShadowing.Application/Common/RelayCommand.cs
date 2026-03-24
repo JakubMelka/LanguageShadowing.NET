@@ -19,5 +19,8 @@ public sealed class RelayCommand : ICommand
 
     public void Execute(object? parameter) => _execute();
 
-    public void NotifyCanExecuteChanged() => CanExecuteChanged?.Invoke(this, EventArgs.Empty);
+    public void NotifyCanExecuteChanged()
+    {
+        UiThread.Post(() => CanExecuteChanged?.Invoke(this, EventArgs.Empty));
+    }
 }

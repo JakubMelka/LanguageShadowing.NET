@@ -27,8 +27,8 @@ public sealed class MainViewModel : ObservableObject
     private double _speechRate = 1.0;
     private double _positionSeconds;
     private double _durationSeconds;
-    private string _statusMessage = "Pripraveno.";
-    private string _shadowingSummary = "Skore se zobrazi po rozpoznavani.";
+    private string _statusMessage = "Ready.";
+    private string _shadowingSummary = "The score will appear after recognition starts.";
     private string _scoreColorHex = "#A0A7B8";
     private int? _shadowingScore;
     private PlaybackStatus _currentPlaybackStatus = PlaybackStatus.Idle;
@@ -115,8 +115,8 @@ public sealed class MainViewModel : ObservableObject
                 WaveformSamples = Array.Empty<float>();
                 ClearRecognizedText();
                 StatusMessage = string.IsNullOrWhiteSpace(value)
-                    ? "Vlozte text pro shadowing."
-                    : "Text upraven. Dalsi Play pripravi novy vystup.";
+                    ? "Enter text to start a shadowing session."
+                    : "Text updated. Press Play to prepare fresh audio.";
                 NotifyCommands();
             }
         }
@@ -235,8 +235,8 @@ public sealed class MainViewModel : ObservableObject
     public bool CanSeek => Capabilities.SupportsSeek && DurationSeconds > 0;
 
     public string RecognitionAvailabilityText => _engine.Recognition.IsAvailable
-        ? (IsRecognizing ? "Mikrofon posloucha" : "Mikrofon pripraven")
-        : "Rozpoznavani neni na teto platforme dostupne";
+        ? (IsRecognizing ? "Microphone is listening" : "Microphone is ready")
+        : "Speech recognition is not available on this platform";
 
     public int? ShadowingScore
     {
@@ -272,7 +272,7 @@ public sealed class MainViewModel : ObservableObject
         }
 
         IsBusy = true;
-        StatusMessage = "Nacitam hlasy a moznosti enginu...";
+        StatusMessage = "Loading voices and engine capabilities...";
 
         try
         {
@@ -295,8 +295,8 @@ public sealed class MainViewModel : ObservableObject
             }).ConfigureAwait(false);
 
             StatusMessage = _voices.Count == 0
-                ? "Nenalezeny zadne hlasy."
-                : "Vyberte hlas, zadejte text a spustte prehravani.";
+                ? "No voices were found."
+                : "Choose a voice, enter text, and start playback.";
             _isInitialized = true;
             InitializeCommand.NotifyCanExecuteChanged();
         }
@@ -310,7 +310,7 @@ public sealed class MainViewModel : ObservableObject
     {
         if (string.IsNullOrWhiteSpace(SourceText))
         {
-            StatusMessage = "Nejdriv vlozte zdrojovy text.";
+            StatusMessage = "Enter the source text first.";
             return;
         }
 
@@ -334,7 +334,7 @@ public sealed class MainViewModel : ObservableObject
 
             if (requiresPreparation)
             {
-                StatusMessage = "Generuji recovy vystup...";
+                StatusMessage = "Generating speech output...";
                 var request = new SpeechSynthesisRequest(SourceText.Trim(), SelectedVoice, SpeechRate);
                 _preparedSynthesis = await _engine.TextToSpeech.PrepareAsync(request).ConfigureAwait(false);
                 _preparedSignature = requestSignature;
@@ -344,8 +344,8 @@ public sealed class MainViewModel : ObservableObject
 
             await _engine.Playback.PlayAsync().ConfigureAwait(false);
             StatusMessage = _engine.Recognition.IsAvailable
-                ? "Prehravani bezi a mikrofon se pripojuje."
-                : "Prehravani bezi. Rozpoznavani na teto platforme neni dostupne.";
+                ? "Playback is running and the microphone is connecting."
+                : "Playback is running. Speech recognition is not available on this platform.";
             await StartRecognitionIfAvailableAsync().ConfigureAwait(false);
             PersistSettings();
         }
@@ -362,7 +362,7 @@ public sealed class MainViewModel : ObservableObject
         {
             await _engine.Playback.PauseAsync().ConfigureAwait(false);
             await StopRecognitionIfRunningAsync().ConfigureAwait(false);
-            StatusMessage = "Prehravani je pozastavene.";
+            StatusMessage = "Playback is paused.";
         }
         finally
         {
@@ -377,7 +377,7 @@ public sealed class MainViewModel : ObservableObject
         {
             await _engine.Playback.StopAsync().ConfigureAwait(false);
             await StopRecognitionIfRunningAsync().ConfigureAwait(false);
-            StatusMessage = "Prehravani zastaveno.";
+            StatusMessage = "Playback stopped.";
         }
         finally
         {
@@ -396,7 +396,7 @@ public sealed class MainViewModel : ObservableObject
         try
         {
             await _engine.Playback.SeekAsync(TimeSpan.Zero).ConfigureAwait(false);
-            StatusMessage = "Pozice vracena na zacatek.";
+            StatusMessage = "Position reset to the beginning.";
         }
         finally
         {
@@ -415,7 +415,7 @@ public sealed class MainViewModel : ObservableObject
             _preparedSignature = null;
             SourceText = string.Empty;
             ClearRecognizedText();
-            StatusMessage = "Vsechny hodnoty byly resetovany.";
+            StatusMessage = "Everything was reset.";
         }
         finally
         {
@@ -440,8 +440,8 @@ public sealed class MainViewModel : ObservableObject
         DurationSeconds = Math.Max(0, synthesisResult.Duration.TotalSeconds);
         WaveformSamples = synthesisResult.Waveform.Samples;
         StatusMessage = synthesisResult.IsEstimated
-            ? "Audio pripraveno v odhadovanem rezimu." 
-            : "Audio pripraveno.";
+            ? "Audio prepared in estimated mode." 
+            : "Audio prepared.";
     }
 
     private async Task StartRecognitionIfAvailableAsync()
@@ -471,7 +471,7 @@ public sealed class MainViewModel : ObservableObject
     {
         RecognizedText = string.Empty;
         ShadowingScore = null;
-        ShadowingSummary = "Skore se zobrazi po rozpoznavani.";
+        ShadowingSummary = "The score will appear after recognition starts.";
         ScoreColorHex = "#A0A7B8";
     }
 
@@ -559,3 +559,4 @@ public sealed class MainViewModel : ObservableObject
         });
     }
 }
+

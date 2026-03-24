@@ -6,7 +6,7 @@ The solution is split into four layers:
 
 - `LanguageShadowing.Core`: speech contracts, capability model, playback/recognition state models, DTOs.
 - `LanguageShadowing.Application`: lightweight MVVM infrastructure, settings abstractions, transcript comparison, and `MainViewModel`.
-- `LanguageShadowing.Infrastructure`: built-in speech engine, waveform generation, settings persistence, Windows adapters, and non-Windows fallbacks.
+- `LanguageShadowing.Infrastructure`: built-in speech engine, waveform generation, settings persistence, Windows adapters, and extension points for future non-Windows fallbacks.
 - `LanguageShadowing.App`: .NET MAUI single-project UI, styles, XAML views, and the custom waveform control.
 
 ## Speech Abstraction
@@ -65,9 +65,9 @@ This path provides the strongest MVP feature set:
 - waveform derived from generated WAV data when available
 - continuous transcription events
 
-### macOS / Mac Catalyst fallback
+### Future non-Windows fallback
 
-A fallback engine is still registered to keep the application functional structure consistent:
+The infrastructure still keeps a fallback path conceptually separated, but the current app target is Windows-only:
 
 - speech is planned as sentence segments
 - playback is executed through `TextToSpeech.Default`
@@ -113,10 +113,10 @@ Source text is intentionally not persisted, following the assignment.
 Implemented structure:
 
 - Windows: primary implementation
-- Mac Catalyst: fallback TTS playback only
 
-Not implemented in this MVP:
+Not targeted in this MVP:
 
+- macOS / Mac Catalyst
 - Android
 - iOS
 - Azure Speech engine
@@ -124,7 +124,7 @@ Not implemented in this MVP:
 ## Known MVP Limits
 
 - No build or runtime validation was executed in this repository snapshot.
-- Mac Catalyst currently uses a degraded playback strategy and no STT adapter.
+- The app project is currently Windows-only.
 - The fallback seek model is sentence-based, not true sample-accurate audio seek.
 - The score is a simple lexical similarity heuristic, not phonetic evaluation.
 - Windows STT/TTS still depends on platform permissions and installed system voices.

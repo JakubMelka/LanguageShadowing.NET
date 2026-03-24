@@ -49,3 +49,4 @@ public sealed class UnsupportedSpeechRecognitionService : ISpeechRecognitionServ
         StateChanged?.Invoke(this, new RecognitionStateChangedEventArgs(status, message));
     }
 }
+

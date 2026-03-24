@@ -41,7 +41,7 @@ public sealed class WindowsAudioPlaybackController : IAudioPlaybackController
 
         if (!synthesisResult.HasAudioPayload)
         {
-            Publish(new PlaybackState(PlaybackStatus.Error, TimeSpan.Zero, synthesisResult.Duration, false, false, "Windows prehravac nedostal audio data."));
+            Publish(new PlaybackState(PlaybackStatus.Error, TimeSpan.Zero, synthesisResult.Duration, false, false, "The Windows player did not receive audio data."));
             return;
         }
 
@@ -55,7 +55,7 @@ public sealed class WindowsAudioPlaybackController : IAudioPlaybackController
 
         _currentStream.Seek(0);
         _player.Source = MediaSource.CreateFromStream(_currentStream, synthesisResult.AudioContentType!);
-        Publish(new PlaybackState(PlaybackStatus.Ready, TimeSpan.Zero, synthesisResult.Duration, true, false, "Audio pripraveno."));
+        Publish(new PlaybackState(PlaybackStatus.Ready, TimeSpan.Zero, synthesisResult.Duration, true, false, "Audio prepared."));
     }
 
     public Task PlayAsync(CancellationToken cancellationToken = default)
@@ -67,7 +67,7 @@ public sealed class WindowsAudioPlaybackController : IAudioPlaybackController
 
         _player.Play();
         _positionTimer.Start();
-        Publish(_state with { Status = PlaybackStatus.Playing, IsBusy = false, Message = "Prehravam syntetizovanou rec." });
+        Publish(_state with { Status = PlaybackStatus.Playing, IsBusy = false, Message = "Playing synthesized speech." });
         return Task.CompletedTask;
     }
 
@@ -75,7 +75,7 @@ public sealed class WindowsAudioPlaybackController : IAudioPlaybackController
     {
         _player.Pause();
         _positionTimer.Stop();
-        Publish(_state with { Status = PlaybackStatus.Paused, Position = _player.PlaybackSession.Position, IsBusy = false, Message = "Prehravani pozastaveno." });
+        Publish(_state with { Status = PlaybackStatus.Paused, Position = _player.PlaybackSession.Position, IsBusy = false, Message = "Playback paused." });
         return Task.CompletedTask;
     }
 
@@ -84,7 +84,7 @@ public sealed class WindowsAudioPlaybackController : IAudioPlaybackController
         _player.Pause();
         _player.PlaybackSession.Position = TimeSpan.Zero;
         _positionTimer.Stop();
-        Publish(_state with { Status = PlaybackStatus.Stopped, Position = TimeSpan.Zero, IsBusy = false, Message = "Prehravani zastaveno." });
+        Publish(_state with { Status = PlaybackStatus.Stopped, Position = TimeSpan.Zero, IsBusy = false, Message = "Playback stopped." });
         return Task.CompletedTask;
     }
 
@@ -111,7 +111,7 @@ public sealed class WindowsAudioPlaybackController : IAudioPlaybackController
                 : position;
 
         _player.PlaybackSession.Position = clamped;
-        Publish(_state with { Position = clamped, Duration = _loaded.Duration, Message = "Pozice aktualizovana." });
+        Publish(_state with { Position = clamped, Duration = _loaded.Duration, Message = "Position updated." });
         return Task.CompletedTask;
     }
 
@@ -126,7 +126,7 @@ public sealed class WindowsAudioPlaybackController : IAudioPlaybackController
     private void OnMediaEnded(MediaPlayer sender, object args)
     {
         _positionTimer.Stop();
-        Publish(_state with { Status = PlaybackStatus.Completed, Position = _loaded?.Duration ?? TimeSpan.Zero, IsBusy = false, Message = "Prehravani dokonceno." });
+        Publish(_state with { Status = PlaybackStatus.Completed, Position = _loaded?.Duration ?? TimeSpan.Zero, IsBusy = false, Message = "Playback completed." });
     }
 
     private void OnMediaFailed(MediaPlayer sender, MediaPlayerFailedEventArgs args)
@@ -152,3 +152,4 @@ public sealed class WindowsAudioPlaybackController : IAudioPlaybackController
     }
 }
 #endif
+

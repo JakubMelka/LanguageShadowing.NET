@@ -7,5 +7,6 @@ public sealed record ShadowingAssessment(
     IReadOnlyList<string> ExtraWords)
 {
     public static ShadowingAssessment Unsupported { get; } =
-        new(null, "Skore neni k dispozici.", Array.Empty<string>(), Array.Empty<string>());
+        new(null, "Score is unavailable.", Array.Empty<string>(), Array.Empty<string>());
 }
+

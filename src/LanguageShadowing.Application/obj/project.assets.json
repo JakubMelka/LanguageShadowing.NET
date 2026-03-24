@@ -1,14 +1,33 @@
 {
   "version": 3,
   "targets": {
-    "net9.0": {}
+    "net9.0": {
+      "LanguageShadowing.Core/1.0.0": {
+        "type": "project",
+        "framework": ".NETCoreApp,Version=v9.0",
+        "compile": {
+          "bin/placeholder/LanguageShadowing.Core.dll": {}
+        },
+        "runtime": {
+          "bin/placeholder/LanguageShadowing.Core.dll": {}
+        }
+      }
+    }
   },
-  "libraries": {},
+  "libraries": {
+    "LanguageShadowing.Core/1.0.0": {
+      "type": "project",
+      "path": "../LanguageShadowing.Core/LanguageShadowing.Core.csproj",
+      "msbuildProject": "../LanguageShadowing.Core/LanguageShadowing.Core.csproj"
+    }
+  },
   "projectFileDependencyGroups": {
-    "net9.0": []
+    "net9.0": [
+      "LanguageShadowing.Core >= 1.0.0"
+    ]
   },
   "packageFolders": {
-    "E:\\Programming\\LangShadowing\\.dotnet\\.nuget\\packages\\": {},
+    "C:\\Users\\MelkaJ\\.nuget\\packages\\": {},
     "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages": {}
   },
   "project": {
@@ -17,7 +36,7 @@
       "projectUniqueName": "E:\\Programming\\LangShadowing\\src\\LanguageShadowing.Application\\LanguageShadowing.Application.csproj",
       "projectName": "LanguageShadowing.Application",
       "projectPath": "E:\\Programming\\LangShadowing\\src\\LanguageShadowing.Application\\LanguageShadowing.Application.csproj",
-      "packagesPath": "E:\\Programming\\LangShadowing\\.dotnet\\.nuget\\packages\\",
+      "packagesPath": "C:\\Users\\MelkaJ\\.nuget\\packages\\",
       "outputPath": "E:\\Programming\\LangShadowing\\src\\LanguageShadowing.Application\\obj\\",
       "projectStyle": "PackageReference",
       "fallbackFolders": [
@@ -33,12 +52,17 @@
       ],
       "sources": {
         "C:\\Program Files (x86)\\Microsoft SDKs\\NuGetPackages\\": {},
+        "C:\\Program Files\\dotnet\\library-packs": {},
         "https://api.nuget.org/v3/index.json": {}
       },
       "frameworks": {
         "net9.0": {
           "targetAlias": "net9.0",
-          "projectReferences": {}
+          "projectReferences": {
+            "E:\\Programming\\LangShadowing\\src\\LanguageShadowing.Core\\LanguageShadowing.Core.csproj": {
+              "projectPath": "E:\\Programming\\LangShadowing\\src\\LanguageShadowing.Core\\LanguageShadowing.Core.csproj"
+            }
+          }
         }
       },
       "warningProperties": {

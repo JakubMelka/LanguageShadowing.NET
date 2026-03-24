@@ -20,7 +20,7 @@ public sealed class ShadowingAnalyzer : IShadowingAnalyzer
 
         if (recognizedTokens.Count == 0)
         {
-            return new ShadowingAssessment(0, "Zatim nebyl rozpoznan zadny text.", sourceTokens.Take(6).ToArray(), Array.Empty<string>());
+            return new ShadowingAssessment(0, "No speech has been recognized yet.", sourceTokens.Take(6).ToArray(), Array.Empty<string>());
         }
 
         var lcs = BuildLcs(sourceTokens, recognizedTokens);
@@ -95,23 +95,24 @@ public sealed class ShadowingAnalyzer : IShadowingAnalyzer
     private static string BuildSummary(int score, IReadOnlyList<string> missing, IReadOnlyList<string> extra)
     {
         var builder = new StringBuilder();
-        builder.Append($"Skore {score}/100.");
+        builder.Append($"Score {score}/100.");
 
         if (missing.Count > 0)
         {
-            builder.Append($" Chybi: {string.Join(", ", missing.Take(4))}.");
+            builder.Append($" Missing: {string.Join(", ", missing.Take(4))}.");
         }
 
         if (extra.Count > 0)
         {
-            builder.Append($" Navic: {string.Join(", ", extra.Take(4))}.");
+            builder.Append($" Extra: {string.Join(", ", extra.Take(4))}.");
         }
 
         if (missing.Count == 0 && extra.Count == 0)
         {
-            builder.Append(" Shoda vypada velmi dobre.");
+            builder.Append(" The match looks very good.");
         }
 
         return builder.ToString();
     }
 }
+

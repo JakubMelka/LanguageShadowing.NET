@@ -79,7 +79,8 @@ public static class ServiceCollectionExtensions
 #if WINDOWS
         return new WindowsSpeechRecognitionService();
 #else
-        return new UnsupportedSpeechRecognitionService("Rozpoznavani reci je v MVP implementovano pouze pro Windows.");
+        return new UnsupportedSpeechRecognitionService("Speech recognition is implemented only for Windows in this MVP.");
 #endif
     }
 }
+

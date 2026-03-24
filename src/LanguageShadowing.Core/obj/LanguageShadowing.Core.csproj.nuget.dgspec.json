@@ -10,7 +10,7 @@
         "projectUniqueName": "E:\\Programming\\LangShadowing\\src\\LanguageShadowing.Core\\LanguageShadowing.Core.csproj",
         "projectName": "LanguageShadowing.Core",
         "projectPath": "E:\\Programming\\LangShadowing\\src\\LanguageShadowing.Core\\LanguageShadowing.Core.csproj",
-        "packagesPath": "E:\\Programming\\LangShadowing\\.dotnet\\.nuget\\packages\\",
+        "packagesPath": "C:\\Users\\MelkaJ\\.nuget\\packages\\",
         "outputPath": "E:\\Programming\\LangShadowing\\src\\LanguageShadowing.Core\\obj\\",
         "projectStyle": "PackageReference",
         "fallbackFolders": [
@@ -26,6 +26,7 @@
         ],
         "sources": {
           "C:\\Program Files (x86)\\Microsoft SDKs\\NuGetPackages\\": {},
+          "C:\\Program Files\\dotnet\\library-packs": {},
           "https://api.nuget.org/v3/index.json": {}
         },
         "frameworks": {
