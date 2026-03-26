@@ -5,8 +5,7 @@
              xmlns:controls="clr-namespace:LanguageShadowing.App.Controls"
              xmlns:converters="clr-namespace:LanguageShadowing.App.Converters"
              x:Class="LanguageShadowing.App.MainPage"
-             x:DataType="viewModels:MainViewModel"
-             Title="Language Shadowing">
+             x:DataType="viewModels:MainViewModel">
     <ContentPage.Resources>
         <converters:HexToColorConverter x:Key="HexToColorConverter" />
     </ContentPage.Resources>

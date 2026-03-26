@@ -18,7 +18,7 @@ public partial class App : Microsoft.Maui.Controls.Application
     protected override Window CreateWindow(IActivationState? activationState)
     {
         var mainPage = _serviceProvider.GetRequiredService<MainPage>();
-        return new Window(new Microsoft.Maui.Controls.NavigationPage(mainPage));
+        return new Window(mainPage);
     }
 
     private void OnRequestedThemeChanged(object? sender, AppThemeChangedEventArgs e)
