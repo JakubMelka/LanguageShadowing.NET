@@ -14,10 +14,25 @@
     <Grid Padding="24"
           BackgroundColor="{DynamicResource PageBackground}"
           ColumnDefinitions="1.7*,1.05*"
-          RowDefinitions="1.2*,Auto,1*"
+          RowDefinitions="Auto,1.2*,Auto,1*"
           ColumnSpacing="18"
           RowSpacing="18">
         <Border Grid.Row="0"
+                Grid.ColumnSpan="2"
+                Style="{StaticResource CardBorderStyle}"
+                Margin="0"
+                Padding="16,14">
+            <VerticalStackLayout Spacing="2">
+                <Label Text="Language Shadowing"
+                       FontSize="24"
+                       FontAttributes="Bold" />
+                <Label Text="Shadow spoken phrases, monitor recognition, and tune the voice profile in one pass."
+                       FontSize="12"
+                       TextColor="{DynamicResource SecondaryText}" />
+            </VerticalStackLayout>
+        </Border>
+
+        <Border Grid.Row="1"
                 Grid.Column="0"
                 Style="{StaticResource CardBorderStyle}"
                 Margin="0"
@@ -37,7 +52,7 @@
             </Grid>
         </Border>
 
-        <Border Grid.Row="0"
+        <Border Grid.Row="1"
                 Grid.RowSpan="2"
                 Grid.Column="1"
                 Style="{StaticResource CardBorderStyle}"
@@ -110,17 +125,17 @@
             </VerticalStackLayout>
         </Border>
 
-        <Border Grid.Row="1"
+        <Border Grid.Row="2"
                 Grid.Column="0"
                 Style="{StaticResource CardBorderStyle}"
                 Margin="0">
             <VerticalStackLayout Spacing="16">
                 <Grid ColumnDefinitions="Auto,Auto,Auto,Auto,Auto,*" ColumnSpacing="10">
-                    <Button Text="Reset" Command="{Binding ResetCommand}" />
-                    <Button Grid.Column="1" Text="Pause" Command="{Binding PauseCommand}" />
-                    <Button Grid.Column="2" Text="Play" Command="{Binding PlayCommand}" BackgroundColor="{DynamicResource AccentColor}" TextColor="White" />
-                    <Button Grid.Column="3" Text="Stop" Command="{Binding StopCommand}" />
-                    <Button Grid.Column="4" Text="Rewind" Command="{Binding RewindCommand}" />
+                    <Button Text="Reset" Style="{StaticResource ToolbarButtonStyle}" Command="{Binding ResetCommand}" />
+                    <Button Grid.Column="1" Text="Pause" Style="{StaticResource ToolbarButtonStyle}" Command="{Binding PauseCommand}" />
+                    <Button Grid.Column="2" Text="Play" Style="{StaticResource ToolbarPrimaryButtonStyle}" Command="{Binding PlayCommand}" />
+                    <Button Grid.Column="3" Text="Stop" Style="{StaticResource ToolbarButtonStyle}" Command="{Binding StopCommand}" />
+                    <Button Grid.Column="4" Text="Rewind" Style="{StaticResource ToolbarButtonStyle}" Command="{Binding RewindCommand}" />
                 </Grid>
 
                 <Grid RowDefinitions="Auto,Auto,Auto" RowSpacing="8">
@@ -148,7 +163,7 @@
             </VerticalStackLayout>
         </Border>
 
-        <Border Grid.Row="2"
+        <Border Grid.Row="3"
                 Grid.Column="0"
                 Style="{StaticResource CardBorderStyle}"
                 Margin="0"
@@ -180,7 +195,7 @@
             </Grid>
         </Border>
 
-        <Border Grid.Row="2"
+        <Border Grid.Row="3"
                 Grid.Column="1"
                 Style="{StaticResource CardBorderStyle}"
                 Margin="0"
