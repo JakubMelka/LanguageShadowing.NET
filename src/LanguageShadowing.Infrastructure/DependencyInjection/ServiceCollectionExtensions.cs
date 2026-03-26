@@ -1,4 +1,4 @@
-﻿using LanguageShadowing.Application.Abstractions;
+using LanguageShadowing.Application.Abstractions;
 using LanguageShadowing.Core.Interfaces;
 using LanguageShadowing.Core.Models;
 using LanguageShadowing.Infrastructure.Engines;
@@ -15,6 +15,7 @@ public static class ServiceCollectionExtensions
     public static IServiceCollection AddLanguageShadowingInfrastructure(this IServiceCollection services)
     {
         services.AddSingleton<IAppDispatcher, MauiAppDispatcher>();
+        services.AddSingleton<IAppThemeService, MauiAppThemeService>();
         services.AddSingleton<IShadowingSettingsStore, PreferencesSettingsStore>();
         services.AddSingleton<SegmentedSpeechPlanner>();
         services.AddSingleton<WaveformFactory>();
@@ -83,4 +84,3 @@ public static class ServiceCollectionExtensions
 #endif
     }
 }
-

@@ -1,4 +1,5 @@
-﻿using System.Collections.ObjectModel;
+using System.Collections.ObjectModel;
+using System.Globalization;
 using LanguageShadowing.Application.Abstractions;
 using LanguageShadowing.Application.Analysis;
 using LanguageShadowing.Application.Common;
@@ -10,11 +11,24 @@ namespace LanguageShadowing.Application.ViewModels;
 
 public sealed class MainViewModel : ObservableObject
 {
+    private const string AutomaticThemeOption = "Automatic";
+    private const string LightThemeOption = "Light";
+    private const string DarkThemeOption = "Dark";
+
+    private static readonly IReadOnlyList<string> AvailableThemeOptions = new[]
+    {
+        AutomaticThemeOption,
+        LightThemeOption,
+        DarkThemeOption
+    };
+
     private readonly ISpeechEngine _engine;
     private readonly IShadowingSettingsStore _settingsStore;
     private readonly IShadowingAnalyzer _analyzer;
     private readonly IAppDispatcher _dispatcher;
+    private readonly IAppThemeService _themeService;
     private readonly ObservableCollection<VoiceInfo> _voices = new();
+    private readonly ObservableCollection<string> _engines = new();
     private IReadOnlyList<float> _waveformSamples = Array.Empty<float>();
     private SpeechEngineCapabilities _capabilities = new(false, false, false, false, false, false);
     private SpeechSynthesisResult? _preparedSynthesis;
@@ -24,7 +38,11 @@ public sealed class MainViewModel : ObservableObject
     private string _sourceText = string.Empty;
     private string _recognizedText = string.Empty;
     private VoiceInfo? _selectedVoice;
+    private string? _selectedEngineName;
+    private string _selectedThemeOption = AutomaticThemeOption;
     private double _speechRate = 1.0;
+    private double _speechPitch = 1.0;
+    private double _speechVolume = 1.0;
     private double _positionSeconds;
     private double _durationSeconds;
     private string _statusMessage = "Ready.";
@@ -38,13 +56,20 @@ public sealed class MainViewModel : ObservableObject
         ISpeechEngine engine,
         IShadowingSettingsStore settingsStore,
         IShadowingAnalyzer analyzer,
-        IAppDispatcher dispatcher)
+        IAppDispatcher dispatcher,
+        IAppThemeService themeService)
     {
         _engine = engine;
         _settingsStore = settingsStore;
         _analyzer = analyzer;
         _dispatcher = dispatcher;
+        _themeService = themeService;
         Voices = AsReadOnly(_voices);
+        Engines = AsReadOnly(_engines);
+        ThemeOptions = AvailableThemeOptions;
+
+        _engines.Add(_engine.Name);
+        _selectedEngineName = _engine.Name;
 
         InitializeCommand = new AsyncRelayCommand(InitializeAsync, () => !_isInitialized && !IsBusy);
         PlayCommand = new AsyncRelayCommand(PlayAsync, () => !IsBusy);
@@ -60,6 +85,10 @@ public sealed class MainViewModel : ObservableObject
     }
 
     public ReadOnlyObservableCollection<VoiceInfo> Voices { get; }
+
+    public ReadOnlyObservableCollection<string> Engines { get; }
+
+    public IReadOnlyList<string> ThemeOptions { get; }
 
     public AsyncRelayCommand InitializeCommand { get; }
 
@@ -88,6 +117,12 @@ public sealed class MainViewModel : ObservableObject
         }
     }
 
+    public string? SelectedEngineName
+    {
+        get => _selectedEngineName;
+        set => SetProperty(ref _selectedEngineName, value ?? _engine.Name);
+    }
+
     public VoiceInfo? SelectedVoice
     {
         get => _selectedVoice;
@@ -96,10 +131,17 @@ public sealed class MainViewModel : ObservableObject
             if (SetProperty(ref _selectedVoice, value))
             {
                 _preparedSignature = null;
+                OnPropertyChanged(nameof(SelectedVoiceLanguage), nameof(SelectedVoiceGender));
                 PersistSettings();
             }
         }
     }
+
+    public string SelectedVoiceLanguage => SelectedVoice?.LanguageDisplay ?? "No voice selected";
+
+    public string SelectedVoiceGender => string.IsNullOrWhiteSpace(SelectedVoice?.Gender)
+        ? ""
+        : SelectedVoice!.Gender!;
 
     public string SourceText
     {
@@ -144,6 +186,54 @@ public sealed class MainViewModel : ObservableObject
     }
 
     public string SpeechRateDisplay => $"{SpeechRate:0.0}x";
+
+    public double SpeechPitch
+    {
+        get => _speechPitch;
+        set
+        {
+            var clamped = Math.Clamp(value, 0.0, 2.0);
+            if (SetProperty(ref _speechPitch, clamped))
+            {
+                _preparedSignature = null;
+                OnPropertyChanged(nameof(SpeechPitchDisplay));
+                PersistSettings();
+            }
+        }
+    }
+
+    public string SpeechPitchDisplay => $"{SpeechPitch:0.00}x";
+
+    public double SpeechVolume
+    {
+        get => _speechVolume;
+        set
+        {
+            var clamped = Math.Clamp(value, 0.0, 1.0);
+            if (SetProperty(ref _speechVolume, clamped))
+            {
+                _preparedSignature = null;
+                OnPropertyChanged(nameof(SpeechVolumeDisplay));
+                PersistSettings();
+            }
+        }
+    }
+
+    public string SpeechVolumeDisplay => $"{SpeechVolume * 100:0}%";
+
+    public string SelectedThemeOption
+    {
+        get => _selectedThemeOption;
+        set
+        {
+            var normalized = NormalizeThemeOption(value);
+            if (SetProperty(ref _selectedThemeOption, normalized))
+            {
+                _themeService.ApplyTheme(MapThemeOption(normalized));
+                PersistSettings();
+            }
+        }
+    }
 
     public IReadOnlyList<float> WaveformSamples
     {
@@ -277,8 +367,12 @@ public sealed class MainViewModel : ObservableObject
         try
         {
             Capabilities = _engine.Capabilities;
+            SelectedEngineName = _engine.Name;
             var settings = await _settingsStore.LoadAsync().ConfigureAwait(false);
+            SelectedThemeOption = MapThemePreferenceToOption(settings.ThemePreference);
             SpeechRate = settings.SpeechRate is >= 0.5 and <= 2.0 ? settings.SpeechRate : 1.0;
+            SpeechPitch = settings.SpeechPitch is >= 0.0 and <= 2.0 ? settings.SpeechPitch : 1.0;
+            SpeechVolume = settings.SpeechVolume is >= 0.0 and <= 1.0 ? settings.SpeechVolume : 1.0;
 
             var voices = await _engine.VoiceCatalog.GetVoicesAsync().ConfigureAwait(false);
             await _dispatcher.RunAsync(() =>
@@ -335,7 +429,7 @@ public sealed class MainViewModel : ObservableObject
             if (requiresPreparation)
             {
                 StatusMessage = "Generating speech output...";
-                var request = new SpeechSynthesisRequest(SourceText.Trim(), SelectedVoice, SpeechRate);
+                var request = new SpeechSynthesisRequest(SourceText.Trim(), SelectedVoice, SpeechRate, SpeechPitch, SpeechVolume);
                 _preparedSynthesis = await _engine.TextToSpeech.PrepareAsync(request).ConfigureAwait(false);
                 _preparedSignature = requestSignature;
                 await _engine.Playback.LoadAsync(_preparedSynthesis).ConfigureAwait(false);
@@ -440,7 +534,7 @@ public sealed class MainViewModel : ObservableObject
         DurationSeconds = Math.Max(0, synthesisResult.Duration.TotalSeconds);
         WaveformSamples = synthesisResult.Waveform.Samples;
         StatusMessage = synthesisResult.IsEstimated
-            ? "Audio prepared in estimated mode." 
+            ? "Audio prepared in estimated mode."
             : "Audio prepared.";
     }
 
@@ -477,7 +571,13 @@ public sealed class MainViewModel : ObservableObject
 
     private string BuildRequestSignature()
     {
-        return string.Join("|", SourceText.Trim(), SelectedVoice?.Id ?? string.Empty, SpeechRate.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture));
+        return string.Join(
+            "|",
+            SourceText.Trim(),
+            SelectedVoice?.Id ?? string.Empty,
+            SpeechRate.ToString("0.00", CultureInfo.InvariantCulture),
+            SpeechPitch.ToString("0.00", CultureInfo.InvariantCulture),
+            SpeechVolume.ToString("0.00", CultureInfo.InvariantCulture));
     }
 
     private void UpdateAssessment()
@@ -509,7 +609,12 @@ public sealed class MainViewModel : ObservableObject
             return;
         }
 
-        _ = _settingsStore.SaveAsync(new ShadowingSettings(SelectedVoice?.Id, SpeechRate));
+        _ = _settingsStore.SaveAsync(new ShadowingSettings(
+            SelectedVoice?.Id,
+            SpeechRate,
+            SpeechPitch,
+            SpeechVolume,
+            MapThemeOption(SelectedThemeOption)));
     }
 
     private void NotifyCommands()
@@ -558,5 +663,34 @@ public sealed class MainViewModel : ObservableObject
             UpdateAssessment();
         });
     }
-}
 
+    private static string NormalizeThemeOption(string? option)
+    {
+        return option switch
+        {
+            LightThemeOption => LightThemeOption,
+            DarkThemeOption => DarkThemeOption,
+            _ => AutomaticThemeOption
+        };
+    }
+
+    private static ThemePreferenceMode MapThemeOption(string option)
+    {
+        return option switch
+        {
+            LightThemeOption => ThemePreferenceMode.Light,
+            DarkThemeOption => ThemePreferenceMode.Dark,
+            _ => ThemePreferenceMode.System
+        };
+    }
+
+    private static string MapThemePreferenceToOption(ThemePreferenceMode preference)
+    {
+        return preference switch
+        {
+            ThemePreferenceMode.Light => LightThemeOption,
+            ThemePreferenceMode.Dark => DarkThemeOption,
+            _ => AutomaticThemeOption
+        };
+    }
+}

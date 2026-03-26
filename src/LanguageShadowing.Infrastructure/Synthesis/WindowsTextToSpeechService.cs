@@ -1,4 +1,4 @@
-﻿#if WINDOWS
+#if WINDOWS
 using System.Runtime.InteropServices.WindowsRuntime;
 using LanguageShadowing.Core.Interfaces;
 using LanguageShadowing.Core.Models;
@@ -34,6 +34,8 @@ public sealed class WindowsTextToSpeechService : ITextToSpeechService
         }
 
         synthesizer.Options.SpeakingRate = Math.Clamp(request.Rate, 0.5, 2.0);
+        synthesizer.Options.AudioPitch = Math.Clamp(request.Pitch, 0.0, 2.0);
+        synthesizer.Options.AudioVolume = Math.Clamp(request.Volume, 0.0, 1.0);
         var stream = await synthesizer.SynthesizeTextToStreamAsync(request.Text);
         using var managedStream = stream.AsStreamForRead();
         using var buffer = new MemoryStream();

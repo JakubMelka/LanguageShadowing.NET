@@ -1,5 +1,8 @@
-﻿namespace LanguageShadowing.Application.Abstractions;
+namespace LanguageShadowing.Application.Abstractions;
 
 public sealed record ShadowingSettings(
     string? PreferredVoiceId,
-    double SpeechRate);
+    double SpeechRate,
+    double SpeechPitch,
+    double SpeechVolume,
+    ThemePreferenceMode ThemePreference);
