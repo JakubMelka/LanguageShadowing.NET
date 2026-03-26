@@ -11,7 +11,7 @@ public partial class App : Microsoft.Maui.Controls.Application
     {
         InitializeComponent();
         _serviceProvider = serviceProvider;
-        ApplyThemePalette(RequestedTheme);
+        ApplyThemePalette(ResolveActiveTheme());
         RequestedThemeChanged += OnRequestedThemeChanged;
     }
 
@@ -23,7 +23,12 @@ public partial class App : Microsoft.Maui.Controls.Application
 
     private void OnRequestedThemeChanged(object? sender, AppThemeChangedEventArgs e)
     {
-        ApplyThemePalette(e.RequestedTheme);
+        ApplyThemePalette(ResolveActiveTheme());
+    }
+
+    private AppTheme ResolveActiveTheme()
+    {
+        return UserAppTheme == AppTheme.Unspecified ? RequestedTheme : UserAppTheme;
     }
 
     private void ApplyThemePalette(AppTheme theme)

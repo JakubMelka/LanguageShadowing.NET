@@ -25,7 +25,7 @@
                 <Label Text="Source text" FontAttributes="Bold" FontSize="18" />
                 <Label Grid.Row="1"
                        Text="Enter the text that should be spoken by the selected voice."
-                       TextColor="{StaticResource SecondaryText}" />
+                       TextColor="{DynamicResource SecondaryText}" />
                 <Editor x:Name="SourceEditor"
                         Grid.Row="2"
                         Text="{Binding SourceText}"
@@ -43,7 +43,7 @@
                 Margin="0">
             <VerticalStackLayout Spacing="14">
                 <Label Text="Speech setup" FontAttributes="Bold" FontSize="18" />
-                <Label Text="Choose the synthesis engine, preferred voice, and playback profile." TextColor="{StaticResource SecondaryText}" />
+                <Label Text="Choose the synthesis engine, preferred voice, and playback profile." TextColor="{DynamicResource SecondaryText}" />
 
                 <VerticalStackLayout Spacing="6">
                     <Label Text="Engine" FontAttributes="Bold" />
@@ -58,8 +58,8 @@
                             SelectedItem="{Binding SelectedVoice}"
                             ItemDisplayBinding="{Binding SelectionLabel}"
                             Title="Choose a voice" />
-                    <Label Text="{Binding SelectedVoiceLanguage}" FontSize="12" TextColor="{StaticResource SecondaryText}" />
-                    <Label Text="{Binding SelectedVoiceGender}" FontSize="12" TextColor="{StaticResource SecondaryText}" />
+                    <Label Text="{Binding SelectedVoiceLanguage}" FontSize="12" TextColor="{DynamicResource SecondaryText}" />
+                    <Label Text="{Binding SelectedVoiceGender}" FontSize="12" TextColor="{DynamicResource SecondaryText}" />
                 </VerticalStackLayout>
 
                 <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="14">
@@ -70,7 +70,7 @@
                     <Border Grid.Row="0"
                             Grid.Column="1"
                             Padding="12,8"
-                            BackgroundColor="{StaticResource SurfaceMuted}"
+                            BackgroundColor="{DynamicResource SurfaceMuted}"
                             StrokeThickness="0"
                             VerticalOptions="End">
                         <Label Text="{Binding SpeechRateDisplay}" FontAttributes="Bold" />
@@ -83,7 +83,7 @@
                     <Border Grid.Row="1"
                             Grid.Column="1"
                             Padding="12,8"
-                            BackgroundColor="{StaticResource SurfaceMuted}"
+                            BackgroundColor="{DynamicResource SurfaceMuted}"
                             StrokeThickness="0"
                             VerticalOptions="End">
                         <Label Text="{Binding SpeechPitchDisplay}" FontAttributes="Bold" />
@@ -96,7 +96,7 @@
                     <Border Grid.Row="2"
                             Grid.Column="1"
                             Padding="12,8"
-                            BackgroundColor="{StaticResource SurfaceMuted}"
+                            BackgroundColor="{DynamicResource SurfaceMuted}"
                             StrokeThickness="0"
                             VerticalOptions="End">
                         <Label Text="{Binding SpeechVolumeDisplay}" FontAttributes="Bold" />
@@ -104,7 +104,7 @@
                 </Grid>
 
                 <Label Text="{Binding RecognitionAvailabilityText}"
-                       TextColor="{StaticResource SecondaryText}"
+                       TextColor="{DynamicResource SecondaryText}"
                        FontSize="12" />
             </VerticalStackLayout>
         </Border>
@@ -117,7 +117,7 @@
                 <Grid ColumnDefinitions="Auto,Auto,Auto,Auto,Auto,*" ColumnSpacing="10">
                     <Button Text="Reset" Command="{Binding ResetCommand}" />
                     <Button Grid.Column="1" Text="Pause" Command="{Binding PauseCommand}" />
-                    <Button Grid.Column="2" Text="Play" Command="{Binding PlayCommand}" BackgroundColor="{StaticResource AccentColor}" TextColor="White" />
+                    <Button Grid.Column="2" Text="Play" Command="{Binding PlayCommand}" BackgroundColor="{DynamicResource AccentColor}" TextColor="White" />
                     <Button Grid.Column="3" Text="Stop" Command="{Binding StopCommand}" />
                     <Button Grid.Column="4" Text="Rewind" Command="{Binding RewindCommand}" />
                 </Grid>
@@ -135,13 +135,13 @@
                             DragCompleted="OnProgressDragCompleted"
                             BackgroundColor="Transparent" />
                     <Grid Grid.Row="1" ColumnDefinitions="Auto,*,Auto">
-                        <Label Text="{Binding PositionText}" TextColor="{StaticResource SecondaryText}" />
+                        <Label Text="{Binding PositionText}" TextColor="{DynamicResource SecondaryText}" />
                         <BoxView Grid.Column="1" BackgroundColor="Transparent" />
-                        <Label Grid.Column="2" Text="{Binding DurationText}" TextColor="{StaticResource SecondaryText}" />
+                        <Label Grid.Column="2" Text="{Binding DurationText}" TextColor="{DynamicResource SecondaryText}" />
                     </Grid>
                     <Label Grid.Row="2"
                            Text="{Binding StatusMessage}"
-                           TextColor="{StaticResource SecondaryText}"
+                           TextColor="{DynamicResource SecondaryText}"
                            FontSize="12" />
                 </Grid>
             </VerticalStackLayout>
@@ -175,7 +175,7 @@
                         MinimumHeightRequest="180"
                         VerticalOptions="FillAndExpand"
                         Placeholder="The microphone will continuously append recognized text." />
-                <Label Grid.Row="2" Text="{Binding ShadowingSummary}" TextColor="{StaticResource SecondaryText}" />
+                <Label Grid.Row="2" Text="{Binding ShadowingSummary}" TextColor="{DynamicResource SecondaryText}" />
             </Grid>
         </Border>
 
@@ -186,7 +186,7 @@
                 VerticalOptions="End">
             <VerticalStackLayout Spacing="10">
                 <Label Text="Appearance" FontAttributes="Bold" FontSize="18" />
-                <Label Text="Switch between light, dark, or automatic theme based on the system preference." TextColor="{StaticResource SecondaryText}" />
+                <Label Text="Switch between light, dark, or automatic theme based on the system preference." TextColor="{DynamicResource SecondaryText}" />
                 <Picker ItemsSource="{Binding ThemeOptions}"
                         SelectedItem="{Binding SelectedThemeOption}"
                         Title="Choose a theme" />

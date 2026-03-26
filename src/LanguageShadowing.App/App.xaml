@@ -14,12 +14,12 @@
             <Color x:Key="AccentSoft">#DCE9FF</Color>
 
             <Style TargetType="ContentPage">
-                <Setter Property="BackgroundColor" Value="{StaticResource PageBackground}" />
+                <Setter Property="BackgroundColor" Value="{DynamicResource PageBackground}" />
             </Style>
 
             <Style x:Key="CardBorderStyle" TargetType="Border">
-                <Setter Property="BackgroundColor" Value="{StaticResource CardBackground}" />
-                <Setter Property="Stroke" Value="{StaticResource BorderColor}" />
+                <Setter Property="BackgroundColor" Value="{DynamicResource CardBackground}" />
+                <Setter Property="Stroke" Value="{DynamicResource BorderColor}" />
                 <Setter Property="StrokeThickness" Value="1" />
                 <Setter Property="Padding" Value="20" />
                 <Setter Property="Margin" Value="0,0,0,18" />
@@ -31,32 +31,32 @@
             </Style>
 
             <Style TargetType="Label">
-                <Setter Property="TextColor" Value="{StaticResource PrimaryText}" />
+                <Setter Property="TextColor" Value="{DynamicResource PrimaryText}" />
             </Style>
 
             <Style TargetType="Button">
-                <Setter Property="BackgroundColor" Value="{StaticResource AccentSoft}" />
-                <Setter Property="TextColor" Value="{StaticResource AccentColor}" />
+                <Setter Property="BackgroundColor" Value="{DynamicResource AccentSoft}" />
+                <Setter Property="TextColor" Value="{DynamicResource AccentColor}" />
                 <Setter Property="CornerRadius" Value="14" />
                 <Setter Property="Padding" Value="16,10" />
                 <Setter Property="FontAttributes" Value="Bold" />
             </Style>
 
             <Style TargetType="Editor">
-                <Setter Property="BackgroundColor" Value="{StaticResource SurfaceMuted}" />
-                <Setter Property="TextColor" Value="{StaticResource PrimaryText}" />
+                <Setter Property="BackgroundColor" Value="{DynamicResource SurfaceMuted}" />
+                <Setter Property="TextColor" Value="{DynamicResource PrimaryText}" />
                 <Setter Property="AutoSize" Value="TextChanges" />
                 <Setter Property="Margin" Value="0,10,0,0" />
             </Style>
 
             <Style TargetType="Picker">
-                <Setter Property="BackgroundColor" Value="{StaticResource SurfaceMuted}" />
-                <Setter Property="TextColor" Value="{StaticResource PrimaryText}" />
-                <Setter Property="TitleColor" Value="{StaticResource SecondaryText}" />
+                <Setter Property="BackgroundColor" Value="{DynamicResource SurfaceMuted}" />
+                <Setter Property="TextColor" Value="{DynamicResource PrimaryText}" />
+                <Setter Property="TitleColor" Value="{DynamicResource SecondaryText}" />
             </Style>
 
             <Style TargetType="Slider">
-                <Setter Property="ThumbColor" Value="{StaticResource AccentColor}" />
+                <Setter Property="ThumbColor" Value="{DynamicResource AccentColor}" />
                 <Setter Property="MinimumTrackColor" Value="#332D7FF9" />
                 <Setter Property="MaximumTrackColor" Value="#00FFFFFF" />
             </Style>
