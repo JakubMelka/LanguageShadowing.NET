@@ -1,4 +1,4 @@
-﻿using LanguageShadowing.Application.Analysis;
+using LanguageShadowing.Application.Analysis;
 using LanguageShadowing.Application.ViewModels;
 using LanguageShadowing.Infrastructure.DependencyInjection;
 
