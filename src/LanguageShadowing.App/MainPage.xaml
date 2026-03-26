@@ -11,156 +11,174 @@
         <converters:HexToColorConverter x:Key="HexToColorConverter" />
     </ContentPage.Resources>
 
-    <ScrollView>
-        <VerticalStackLayout Padding="24" Spacing="0" MaximumWidthRequest="1220">
-            <Grid ColumnDefinitions="1.7*,1.05*" ColumnSpacing="18">
-                <Border Grid.Column="0" Style="{StaticResource CardBorderStyle}">
-                    <VerticalStackLayout Spacing="12">
-                        <Label Text="Source text" FontAttributes="Bold" FontSize="18" />
-                        <Label Text="Enter the text that should be spoken by the selected voice." TextColor="{StaticResource SecondaryText}" />
-                        <Editor Text="{Binding SourceText}"
-                                HeightRequest="320"
-                                Placeholder="For example: Today I am practicing pronunciation by shadowing each sentence." />
+    <Grid Padding="24"
+          ColumnDefinitions="1.7*,1.05*"
+          RowDefinitions="1.2*,Auto,1*"
+          ColumnSpacing="18"
+          RowSpacing="18">
+        <Border Grid.Row="0"
+                Grid.Column="0"
+                Style="{StaticResource CardBorderStyle}"
+                Margin="0">
+            <VerticalStackLayout Spacing="12">
+                <Label Text="Source text" FontAttributes="Bold" FontSize="18" />
+                <Label Text="Enter the text that should be spoken by the selected voice." TextColor="{StaticResource SecondaryText}" />
+                <Editor Text="{Binding SourceText}"
+                        VerticalOptions="FillAndExpand"
+                        Placeholder="For example: Today I am practicing pronunciation by shadowing each sentence." />
+            </VerticalStackLayout>
+        </Border>
+
+        <Border Grid.Row="0"
+                Grid.RowSpan="2"
+                Grid.Column="1"
+                Style="{StaticResource CardBorderStyle}"
+                Margin="0">
+            <VerticalStackLayout Spacing="14">
+                <Label Text="Speech setup" FontAttributes="Bold" FontSize="18" />
+                <Label Text="Choose the synthesis engine, preferred voice, and playback profile." TextColor="{StaticResource SecondaryText}" />
+
+                <VerticalStackLayout Spacing="6">
+                    <Label Text="Engine" FontAttributes="Bold" />
+                    <Picker ItemsSource="{Binding Engines}"
+                            SelectedItem="{Binding SelectedEngineName}"
+                            Title="Choose an engine" />
+                </VerticalStackLayout>
+
+                <VerticalStackLayout Spacing="6">
+                    <Label Text="Voice" FontAttributes="Bold" />
+                    <Picker ItemsSource="{Binding Voices}"
+                            SelectedItem="{Binding SelectedVoice}"
+                            ItemDisplayBinding="{Binding SelectionLabel}"
+                            Title="Choose a voice" />
+                    <Label Text="{Binding SelectedVoiceLanguage}" FontSize="12" TextColor="{StaticResource SecondaryText}" />
+                    <Label Text="{Binding SelectedVoiceGender}" FontSize="12" TextColor="{StaticResource SecondaryText}" />
+                </VerticalStackLayout>
+
+                <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="14">
+                    <VerticalStackLayout Grid.Row="0" Spacing="6">
+                        <Label Text="Speed" FontAttributes="Bold" />
+                        <Slider Minimum="0.5" Maximum="2" Value="{Binding SpeechRate}" />
                     </VerticalStackLayout>
-                </Border>
-
-                <Grid Grid.Column="1" RowDefinitions="Auto,Auto" RowSpacing="18">
-                    <Border Grid.Row="0" Style="{StaticResource CardBorderStyle}">
-                        <VerticalStackLayout Spacing="14">
-                            <Label Text="Speech setup" FontAttributes="Bold" FontSize="18" />
-                            <Label Text="Choose the synthesis engine, preferred voice, and playback profile." TextColor="{StaticResource SecondaryText}" />
-
-                            <VerticalStackLayout Spacing="6">
-                                <Label Text="Engine" FontAttributes="Bold" />
-                                <Picker ItemsSource="{Binding Engines}"
-                                        SelectedItem="{Binding SelectedEngineName}"
-                                        Title="Choose an engine" />
-                            </VerticalStackLayout>
-
-                            <VerticalStackLayout Spacing="6">
-                                <Label Text="Voice" FontAttributes="Bold" />
-                                <Picker ItemsSource="{Binding Voices}"
-                                        SelectedItem="{Binding SelectedVoice}"
-                                        ItemDisplayBinding="{Binding SelectionLabel}"
-                                        Title="Choose a voice" />
-                                <Label Text="{Binding SelectedVoiceLanguage}" FontSize="12" TextColor="{StaticResource SecondaryText}" />
-                                <Label Text="{Binding SelectedVoiceGender}" FontSize="12" TextColor="{StaticResource SecondaryText}" />
-                            </VerticalStackLayout>
-
-                            <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="14">
-                                <VerticalStackLayout Grid.Row="0" Spacing="6">
-                                    <Label Text="Speed" FontAttributes="Bold" />
-                                    <Slider Minimum="0.5" Maximum="2" Value="{Binding SpeechRate}" />
-                                </VerticalStackLayout>
-                                <Border Grid.Row="0"
-                                        Grid.Column="1"
-                                        Padding="12,8"
-                                        BackgroundColor="{StaticResource SurfaceMuted}"
-                                        StrokeThickness="0"
-                                        VerticalOptions="End">
-                                    <Label Text="{Binding SpeechRateDisplay}" FontAttributes="Bold" />
-                                </Border>
-
-                                <VerticalStackLayout Grid.Row="1" Spacing="6">
-                                    <Label Text="Pitch" FontAttributes="Bold" />
-                                    <Slider Minimum="0" Maximum="2" Value="{Binding SpeechPitch}" />
-                                </VerticalStackLayout>
-                                <Border Grid.Row="1"
-                                        Grid.Column="1"
-                                        Padding="12,8"
-                                        BackgroundColor="{StaticResource SurfaceMuted}"
-                                        StrokeThickness="0"
-                                        VerticalOptions="End">
-                                    <Label Text="{Binding SpeechPitchDisplay}" FontAttributes="Bold" />
-                                </Border>
-
-                                <VerticalStackLayout Grid.Row="2" Spacing="6">
-                                    <Label Text="Volume" FontAttributes="Bold" />
-                                    <Slider Minimum="0" Maximum="1" Value="{Binding SpeechVolume}" />
-                                </VerticalStackLayout>
-                                <Border Grid.Row="2"
-                                        Grid.Column="1"
-                                        Padding="12,8"
-                                        BackgroundColor="{StaticResource SurfaceMuted}"
-                                        StrokeThickness="0"
-                                        VerticalOptions="End">
-                                    <Label Text="{Binding SpeechVolumeDisplay}" FontAttributes="Bold" />
-                                </Border>
-                            </Grid>
-
-                            <Label Text="{Binding RecognitionAvailabilityText}"
-                                   TextColor="{StaticResource SecondaryText}"
-                                   FontSize="12" />
-                        </VerticalStackLayout>
+                    <Border Grid.Row="0"
+                            Grid.Column="1"
+                            Padding="12,8"
+                            BackgroundColor="{StaticResource SurfaceMuted}"
+                            StrokeThickness="0"
+                            VerticalOptions="End">
+                        <Label Text="{Binding SpeechRateDisplay}" FontAttributes="Bold" />
                     </Border>
 
-                    <Border Grid.Row="1" Style="{StaticResource CardBorderStyle}" VerticalOptions="End">
-                        <VerticalStackLayout Spacing="10">
-                            <Label Text="Appearance" FontAttributes="Bold" FontSize="18" />
-                            <Label Text="Switch between light, dark, or automatic theme based on the system preference." TextColor="{StaticResource SecondaryText}" />
-                            <Picker ItemsSource="{Binding ThemeOptions}"
-                                    SelectedItem="{Binding SelectedThemeOption}"
-                                    Title="Choose a theme" />
-                        </VerticalStackLayout>
+                    <VerticalStackLayout Grid.Row="1" Spacing="6">
+                        <Label Text="Pitch" FontAttributes="Bold" />
+                        <Slider Minimum="0" Maximum="2" Value="{Binding SpeechPitch}" />
+                    </VerticalStackLayout>
+                    <Border Grid.Row="1"
+                            Grid.Column="1"
+                            Padding="12,8"
+                            BackgroundColor="{StaticResource SurfaceMuted}"
+                            StrokeThickness="0"
+                            VerticalOptions="End">
+                        <Label Text="{Binding SpeechPitchDisplay}" FontAttributes="Bold" />
+                    </Border>
+
+                    <VerticalStackLayout Grid.Row="2" Spacing="6">
+                        <Label Text="Volume" FontAttributes="Bold" />
+                        <Slider Minimum="0" Maximum="1" Value="{Binding SpeechVolume}" />
+                    </VerticalStackLayout>
+                    <Border Grid.Row="2"
+                            Grid.Column="1"
+                            Padding="12,8"
+                            BackgroundColor="{StaticResource SurfaceMuted}"
+                            StrokeThickness="0"
+                            VerticalOptions="End">
+                        <Label Text="{Binding SpeechVolumeDisplay}" FontAttributes="Bold" />
                     </Border>
                 </Grid>
-            </Grid>
 
-            <Border Style="{StaticResource CardBorderStyle}">
-                <VerticalStackLayout Spacing="16">
-                    <Grid ColumnDefinitions="Auto,Auto,Auto,Auto,Auto,*" ColumnSpacing="10">
-                        <Button Text="Reset" Command="{Binding ResetCommand}" />
-                        <Button Grid.Column="1" Text="Pause" Command="{Binding PauseCommand}" />
-                        <Button Grid.Column="2" Text="Play" Command="{Binding PlayCommand}" BackgroundColor="{StaticResource AccentColor}" TextColor="White" />
-                        <Button Grid.Column="3" Text="Stop" Command="{Binding StopCommand}" />
-                        <Button Grid.Column="4" Text="Rewind" Command="{Binding RewindCommand}" />
+                <Label Text="{Binding RecognitionAvailabilityText}"
+                       TextColor="{StaticResource SecondaryText}"
+                       FontSize="12" />
+            </VerticalStackLayout>
+        </Border>
+
+        <Border Grid.Row="1"
+                Grid.Column="0"
+                Style="{StaticResource CardBorderStyle}"
+                Margin="0">
+            <VerticalStackLayout Spacing="16">
+                <Grid ColumnDefinitions="Auto,Auto,Auto,Auto,Auto,*" ColumnSpacing="10">
+                    <Button Text="Reset" Command="{Binding ResetCommand}" />
+                    <Button Grid.Column="1" Text="Pause" Command="{Binding PauseCommand}" />
+                    <Button Grid.Column="2" Text="Play" Command="{Binding PlayCommand}" BackgroundColor="{StaticResource AccentColor}" TextColor="White" />
+                    <Button Grid.Column="3" Text="Stop" Command="{Binding StopCommand}" />
+                    <Button Grid.Column="4" Text="Rewind" Command="{Binding RewindCommand}" />
+                </Grid>
+
+                <Grid RowDefinitions="Auto,Auto,Auto" RowSpacing="8">
+                    <controls:WaveformView Grid.Row="0"
+                                           Samples="{Binding WaveformSamples}"
+                                           Progress="{Binding ProgressRatio}" />
+                    <Slider x:Name="ProgressSlider"
+                            Grid.Row="0"
+                            Margin="8,0"
+                            Minimum="0"
+                            Maximum="{Binding ProgressMaximum}"
+                            Value="{Binding PositionSeconds, Mode=OneWay}"
+                            DragCompleted="OnProgressDragCompleted"
+                            BackgroundColor="Transparent" />
+                    <Grid Grid.Row="1" ColumnDefinitions="Auto,*,Auto">
+                        <Label Text="{Binding PositionText}" TextColor="{StaticResource SecondaryText}" />
+                        <BoxView Grid.Column="1" BackgroundColor="Transparent" />
+                        <Label Grid.Column="2" Text="{Binding DurationText}" TextColor="{StaticResource SecondaryText}" />
                     </Grid>
+                    <Label Grid.Row="2"
+                           Text="{Binding StatusMessage}"
+                           TextColor="{StaticResource SecondaryText}"
+                           FontSize="12" />
+                </Grid>
+            </VerticalStackLayout>
+        </Border>
 
-                    <Grid RowDefinitions="Auto,Auto,Auto" RowSpacing="8">
-                        <controls:WaveformView Grid.Row="0"
-                                               Samples="{Binding WaveformSamples}"
-                                               Progress="{Binding ProgressRatio}" />
-                        <Slider x:Name="ProgressSlider"
-                                Grid.Row="0"
-                                Margin="8,0"
-                                Minimum="0"
-                                Maximum="{Binding ProgressMaximum}"
-                                Value="{Binding PositionSeconds, Mode=OneWay}"
-                                DragCompleted="OnProgressDragCompleted"
-                                BackgroundColor="Transparent" />
-                        <Grid Grid.Row="1" ColumnDefinitions="Auto,*,Auto">
-                            <Label Text="{Binding PositionText}" TextColor="{StaticResource SecondaryText}" />
-                            <BoxView Grid.Column="1" BackgroundColor="Transparent" />
-                            <Label Grid.Column="2" Text="{Binding DurationText}" TextColor="{StaticResource SecondaryText}" />
-                        </Grid>
-                        <Label Grid.Row="2"
-                               Text="{Binding StatusMessage}"
-                               TextColor="{StaticResource SecondaryText}"
-                               FontSize="12" />
-                    </Grid>
-                </VerticalStackLayout>
-            </Border>
+        <Border Grid.Row="2"
+                Grid.Column="0"
+                Style="{StaticResource CardBorderStyle}"
+                Margin="0">
+            <VerticalStackLayout Spacing="14">
+                <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="12">
+                    <Label Text="Recognized transcript" FontAttributes="Bold" FontSize="18" />
+                    <Border Grid.Column="1"
+                            Padding="14,8"
+                            BackgroundColor="{Binding ScoreColorHex, Converter={StaticResource HexToColorConverter}}"
+                            StrokeThickness="0">
+                        <Border.StrokeShape>
+                            <RoundRectangle CornerRadius="14" />
+                        </Border.StrokeShape>
+                        <Label Text="{Binding ScoreText}" TextColor="White" FontAttributes="Bold" />
+                    </Border>
+                    <Button Grid.Column="2" Text="Clear" Command="{Binding ClearRecognizedCommand}" />
+                </Grid>
 
-            <Border Style="{StaticResource CardBorderStyle}">
-                <VerticalStackLayout Spacing="14">
-                    <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="12">
-                        <Label Text="Recognized transcript" FontAttributes="Bold" FontSize="18" />
-                        <Border Grid.Column="1"
-                                Padding="14,8"
-                                BackgroundColor="{Binding ScoreColorHex, Converter={StaticResource HexToColorConverter}}"
-                                StrokeThickness="0">
-                            <Border.StrokeShape>
-                                <RoundRectangle CornerRadius="14" />
-                            </Border.StrokeShape>
-                            <Label Text="{Binding ScoreText}" TextColor="White" FontAttributes="Bold" />
-                        </Border>
-                        <Button Grid.Column="2" Text="Clear" Command="{Binding ClearRecognizedCommand}" />
-                    </Grid>
+                <Editor Text="{Binding RecognizedText}"
+                        IsReadOnly="True"
+                        VerticalOptions="FillAndExpand"
+                        Placeholder="The microphone will continuously append recognized text." />
+                <Label Text="{Binding ShadowingSummary}" TextColor="{StaticResource SecondaryText}" />
+            </VerticalStackLayout>
+        </Border>
 
-                    <Editor Text="{Binding RecognizedText}" IsReadOnly="True" HeightRequest="180" Placeholder="The microphone will continuously append recognized text." />
-                    <Label Text="{Binding ShadowingSummary}" TextColor="{StaticResource SecondaryText}" />
-                </VerticalStackLayout>
-            </Border>
-        </VerticalStackLayout>
-    </ScrollView>
+        <Border Grid.Row="2"
+                Grid.Column="1"
+                Style="{StaticResource CardBorderStyle}"
+                Margin="0"
+                VerticalOptions="End">
+            <VerticalStackLayout Spacing="10">
+                <Label Text="Appearance" FontAttributes="Bold" FontSize="18" />
+                <Label Text="Switch between light, dark, or automatic theme based on the system preference." TextColor="{StaticResource SecondaryText}" />
+                <Picker ItemsSource="{Binding ThemeOptions}"
+                        SelectedItem="{Binding SelectedThemeOption}"
+                        Title="Choose a theme" />
+            </VerticalStackLayout>
+        </Border>
+    </Grid>
 </ContentPage>
