@@ -1,4 +1,4 @@
-﻿using System.Windows.Input;
+using System.Windows.Input;
 
 namespace LanguageShadowing.Application.Common;
 
@@ -6,11 +6,13 @@ public sealed class RelayCommand : ICommand
 {
     private readonly Action _execute;
     private readonly Func<bool>? _canExecute;
+    private readonly SynchronizationContext? _synchronizationContext;
 
     public RelayCommand(Action execute, Func<bool>? canExecute = null)
     {
         _execute = execute;
         _canExecute = canExecute;
+        _synchronizationContext = SynchronizationContext.Current;
     }
 
     public event EventHandler? CanExecuteChanged;
@@ -21,6 +23,12 @@ public sealed class RelayCommand : ICommand
 
     public void NotifyCanExecuteChanged()
     {
-        UiThread.Post(() => CanExecuteChanged?.Invoke(this, EventArgs.Empty));
+        if (_synchronizationContext is null)
+        {
+            CanExecuteChanged?.Invoke(this, EventArgs.Empty);
+            return;
+        }
+
+        _synchronizationContext.Post(_ => CanExecuteChanged?.Invoke(this, EventArgs.Empty), null);
     }
 }

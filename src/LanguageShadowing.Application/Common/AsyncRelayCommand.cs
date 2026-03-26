@@ -1,4 +1,4 @@
-﻿using System.Windows.Input;
+using System.Windows.Input;
 
 namespace LanguageShadowing.Application.Common;
 
@@ -6,12 +6,14 @@ public sealed class AsyncRelayCommand : ICommand
 {
     private readonly Func<Task> _execute;
     private readonly Func<bool>? _canExecute;
+    private readonly SynchronizationContext? _synchronizationContext;
     private bool _isRunning;
 
     public AsyncRelayCommand(Func<Task> execute, Func<bool>? canExecute = null)
     {
         _execute = execute;
         _canExecute = canExecute;
+        _synchronizationContext = SynchronizationContext.Current;
     }
 
     public event EventHandler? CanExecuteChanged;
@@ -41,6 +43,12 @@ public sealed class AsyncRelayCommand : ICommand
 
     public void NotifyCanExecuteChanged()
     {
-        UiThread.Post(() => CanExecuteChanged?.Invoke(this, EventArgs.Empty));
+        if (_synchronizationContext is null)
+        {
+            CanExecuteChanged?.Invoke(this, EventArgs.Empty);
+            return;
+        }
+
+        _synchronizationContext.Post(_ => CanExecuteChanged?.Invoke(this, EventArgs.Empty), null);
     }
 }

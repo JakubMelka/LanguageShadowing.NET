@@ -1,4 +1,4 @@
-﻿using LanguageShadowing.Application.Common;
+using LanguageShadowing.Application.Common;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace LanguageShadowing.App;
@@ -11,7 +11,6 @@ public partial class App : Microsoft.Maui.Controls.Application
     {
         InitializeComponent();
         _serviceProvider = serviceProvider;
-        UiThread.Initialize(SynchronizationContext.Current);
     }
 
     protected override Window CreateWindow(IActivationState? activationState)
