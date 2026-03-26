@@ -12,6 +12,7 @@
     <ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>
     <ApplicationVersion>1</ApplicationVersion>
     <WindowsPackageType>None</WindowsPackageType>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
     <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.19041.0</SupportedOSPlatformVersion>
   </PropertyGroup>
 
