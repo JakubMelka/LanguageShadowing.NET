@@ -12,6 +12,7 @@
     </ContentPage.Resources>
 
     <Grid Padding="24"
+          BackgroundColor="{DynamicResource PageBackground}"
           ColumnDefinitions="1.7*,1.05*"
           RowDefinitions="1.2*,Auto,1*"
           ColumnSpacing="18"

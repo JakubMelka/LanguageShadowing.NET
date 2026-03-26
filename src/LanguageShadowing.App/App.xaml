@@ -45,6 +45,7 @@
             <Style TargetType="Editor">
                 <Setter Property="BackgroundColor" Value="{DynamicResource SurfaceMuted}" />
                 <Setter Property="TextColor" Value="{DynamicResource PrimaryText}" />
+                <Setter Property="PlaceholderColor" Value="{DynamicResource SecondaryText}" />
                 <Setter Property="AutoSize" Value="TextChanges" />
                 <Setter Property="Margin" Value="0,10,0,0" />
             </Style>
