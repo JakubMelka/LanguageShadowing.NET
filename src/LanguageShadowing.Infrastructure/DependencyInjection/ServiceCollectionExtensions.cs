@@ -62,7 +62,9 @@ public static class ServiceCollectionExtensions
             serviceProvider.GetRequiredService<SegmentedSpeechPlanner>(),
             serviceProvider.GetRequiredService<WaveformFactory>());
 #else
-        return new FallbackTextToSpeechService(serviceProvider.GetRequiredService<SegmentedSpeechPlanner>());
+        return new FallbackTextToSpeechService(
+            serviceProvider.GetRequiredService<SegmentedSpeechPlanner>(),
+            serviceProvider.GetRequiredService<WaveformFactory>());
 #endif
     }
 

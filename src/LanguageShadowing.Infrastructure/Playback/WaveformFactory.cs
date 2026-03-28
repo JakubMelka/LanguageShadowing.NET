@@ -1,11 +1,13 @@
-﻿using System.Buffers.Binary;
+using System.Buffers.Binary;
 using LanguageShadowing.Core.Models;
 
 namespace LanguageShadowing.Infrastructure.Playback;
 
 public sealed class WaveformFactory
 {
-    public WaveformData CreateEstimated(IReadOnlyList<SpeechSegment> segments, int sampleCount = 144)
+    public const int SampleCount = 144;
+
+    public WaveformData CreateEstimated(IReadOnlyList<SpeechSegment> segments, int sampleCount)
     {
         if (segments.Count == 0)
         {

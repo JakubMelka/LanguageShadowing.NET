@@ -11,9 +11,12 @@ public sealed record VoiceInfo(
 {
     public string LanguageDisplay => TryGetLanguageDisplay(Locale);
 
-    public string SelectionLabel => string.IsNullOrWhiteSpace(LanguageDisplay)
-        ? DisplayName
-        : $"{DisplayName} ({LanguageDisplay})";
+    public string SelectionLabel => string.Join(" | ", new[]
+    {
+        DisplayName,
+        string.IsNullOrWhiteSpace(Gender) ? "Unknown" : Gender,
+        string.IsNullOrWhiteSpace(LanguageDisplay) ? "Unknown language" : LanguageDisplay
+    });
 
     private static string TryGetLanguageDisplay(string locale)
     {

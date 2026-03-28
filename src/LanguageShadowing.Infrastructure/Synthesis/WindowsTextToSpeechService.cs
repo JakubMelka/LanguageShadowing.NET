@@ -42,10 +42,10 @@ public sealed class WindowsTextToSpeechService : ITextToSpeechService
         await managedStream.CopyToAsync(buffer, cancellationToken).ConfigureAwait(false);
 
         var bytes = buffer.ToArray();
-        var hasWaveform = _waveformFactory.TryCreateFromWave(bytes, 144, out var waveform, out var actualDuration);
+        var hasWaveform = _waveformFactory.TryCreateFromWave(bytes, WaveformFactory.SampleCount, out var waveform, out var actualDuration);
         if (!hasWaveform)
         {
-            waveform = _waveformFactory.CreateEstimated(segments);
+            waveform = _waveformFactory.CreateEstimated(segments, WaveformFactory.SampleCount);
             actualDuration = estimatedDuration;
         }
 
