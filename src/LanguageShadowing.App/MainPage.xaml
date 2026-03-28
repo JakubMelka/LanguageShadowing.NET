@@ -74,8 +74,6 @@
                             SelectedItem="{Binding SelectedVoice}"
                             ItemDisplayBinding="{Binding SelectionLabel, x:DataType=models:VoiceInfo}"
                             Title="Choose a voice" />
-                    <Label Text="{Binding SelectedVoiceLanguage}" FontSize="12" TextColor="{DynamicResource SecondaryText}" />
-                    <Label Text="{Binding SelectedVoiceGender}" FontSize="12" TextColor="{DynamicResource SecondaryText}" />
                 </VerticalStackLayout>
 
                 <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="14">
