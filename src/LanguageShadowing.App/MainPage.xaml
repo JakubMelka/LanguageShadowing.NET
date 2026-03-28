@@ -73,8 +73,11 @@
                         <Label Text="Voice" FontAttributes="Bold" />
                         <Picker ItemsSource="{Binding Voices}"
                                 SelectedItem="{Binding SelectedVoice}"
-                                ItemDisplayBinding="{Binding SelectionLabel, x:DataType=models:VoiceInfo}"
-                                Title="Choose a voice" />
+                                Title="Choose a voice">
+                            <Picker.ItemDisplayBinding>
+                                <Binding Path="SelectionLabel" x:DataType="models:VoiceInfo" />
+                            </Picker.ItemDisplayBinding>
+                        </Picker>
                     </VerticalStackLayout>
 
                     <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="14">
