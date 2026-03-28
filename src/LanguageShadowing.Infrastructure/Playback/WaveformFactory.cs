@@ -5,7 +5,7 @@ namespace LanguageShadowing.Infrastructure.Playback;
 
 public sealed class WaveformFactory
 {
-    public WaveformData CreateEstimated(IReadOnlyList<SpeechSegment> segments, int sampleCount = 72)
+    public WaveformData CreateEstimated(IReadOnlyList<SpeechSegment> segments, int sampleCount = 144)
     {
         if (segments.Count == 0)
         {

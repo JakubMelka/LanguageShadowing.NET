@@ -1,4 +1,4 @@
-﻿#if WINDOWS
+#if WINDOWS
 using LanguageShadowing.Core.Enums;
 using LanguageShadowing.Core.Interfaces;
 using LanguageShadowing.Core.Models;
@@ -11,7 +11,6 @@ namespace LanguageShadowing.Infrastructure.Playback;
 public sealed class WindowsAudioPlaybackController : IAudioPlaybackController
 {
     private readonly MediaPlayer _player;
-    private readonly System.Timers.Timer _positionTimer;
     private InMemoryRandomAccessStream? _currentStream;
     private SpeechSynthesisResult? _loaded;
     private PlaybackState _state = PlaybackState.Idle;
@@ -21,13 +20,8 @@ public sealed class WindowsAudioPlaybackController : IAudioPlaybackController
         _player = new MediaPlayer();
         _player.MediaEnded += OnMediaEnded;
         _player.MediaFailed += OnMediaFailed;
-
-        _positionTimer = new System.Timers.Timer(150);
-        _positionTimer.Elapsed += (_, _) => Publish(_state with
-        {
-            Position = _player.PlaybackSession.Position,
-            Duration = _loaded?.Duration ?? _state.Duration
-        });
+        _player.PlaybackSession.PositionChanged += OnPositionChanged;
+        _player.PlaybackSession.NaturalDurationChanged += OnNaturalDurationChanged;
     }
 
     public PlaybackState CurrentState => _state;
@@ -66,16 +60,28 @@ public sealed class WindowsAudioPlaybackController : IAudioPlaybackController
         }
 
         _player.Play();
-        _positionTimer.Start();
-        Publish(_state with { Status = PlaybackStatus.Playing, IsBusy = false, Message = "Playing synthesized speech." });
+        Publish(_state with
+        {
+            Status = PlaybackStatus.Playing,
+            Position = _player.PlaybackSession.Position,
+            Duration = _loaded.Duration,
+            IsBusy = false,
+            Message = "Playing synthesized speech."
+        });
         return Task.CompletedTask;
     }
 
     public Task PauseAsync(CancellationToken cancellationToken = default)
     {
         _player.Pause();
-        _positionTimer.Stop();
-        Publish(_state with { Status = PlaybackStatus.Paused, Position = _player.PlaybackSession.Position, IsBusy = false, Message = "Playback paused." });
+        Publish(_state with
+        {
+            Status = PlaybackStatus.Paused,
+            Position = _player.PlaybackSession.Position,
+            Duration = _loaded?.Duration ?? _state.Duration,
+            IsBusy = false,
+            Message = "Playback paused."
+        });
         return Task.CompletedTask;
     }
 
@@ -83,7 +89,6 @@ public sealed class WindowsAudioPlaybackController : IAudioPlaybackController
     {
         _player.Pause();
         _player.PlaybackSession.Position = TimeSpan.Zero;
-        _positionTimer.Stop();
         Publish(_state with { Status = PlaybackStatus.Stopped, Position = TimeSpan.Zero, IsBusy = false, Message = "Playback stopped." });
         return Task.CompletedTask;
     }
@@ -117,21 +122,44 @@ public sealed class WindowsAudioPlaybackController : IAudioPlaybackController
 
     public async ValueTask DisposeAsync()
     {
-        _positionTimer.Stop();
-        _positionTimer.Dispose();
+        _player.PlaybackSession.PositionChanged -= OnPositionChanged;
+        _player.PlaybackSession.NaturalDurationChanged -= OnNaturalDurationChanged;
         _player.Dispose();
         await DisposeStreamAsync().ConfigureAwait(false);
     }
 
+    private void OnPositionChanged(MediaPlaybackSession sender, object args)
+    {
+        if (_loaded is null)
+        {
+            return;
+        }
+
+        Publish(_state with
+        {
+            Position = sender.Position,
+            Duration = _loaded.Duration
+        });
+    }
+
+    private void OnNaturalDurationChanged(MediaPlaybackSession sender, object args)
+    {
+        if (_loaded is null)
+        {
+            return;
+        }
+
+        var duration = sender.NaturalDuration > TimeSpan.Zero ? sender.NaturalDuration : _loaded.Duration;
+        Publish(_state with { Duration = duration });
+    }
+
     private void OnMediaEnded(MediaPlayer sender, object args)
     {
-        _positionTimer.Stop();
         Publish(_state with { Status = PlaybackStatus.Completed, Position = _loaded?.Duration ?? TimeSpan.Zero, IsBusy = false, Message = "Playback completed." });
     }
 
     private void OnMediaFailed(MediaPlayer sender, MediaPlayerFailedEventArgs args)
     {
-        _positionTimer.Stop();
         Publish(_state with { Status = PlaybackStatus.Error, IsBusy = false, Message = args.ErrorMessage });
     }
 
@@ -152,4 +180,3 @@ public sealed class WindowsAudioPlaybackController : IAudioPlaybackController
     }
 }
 #endif
-
