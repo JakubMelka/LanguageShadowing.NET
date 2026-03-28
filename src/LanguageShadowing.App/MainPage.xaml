@@ -4,6 +4,7 @@
              xmlns:viewModels="clr-namespace:LanguageShadowing.Application.ViewModels;assembly=LanguageShadowing.Application"
              xmlns:controls="clr-namespace:LanguageShadowing.App.Controls"
              xmlns:converters="clr-namespace:LanguageShadowing.App.Converters"
+             xmlns:models="clr-namespace:LanguageShadowing.Core.Models;assembly=LanguageShadowing.Core"
              x:Class="LanguageShadowing.App.MainPage"
              x:DataType="viewModels:MainViewModel">
     <ContentPage.Resources>
@@ -71,7 +72,7 @@
                     <Label Text="Voice" FontAttributes="Bold" />
                     <Picker ItemsSource="{Binding Voices}"
                             SelectedItem="{Binding SelectedVoice}"
-                            ItemDisplayBinding="{Binding SelectionLabel}"
+                            ItemDisplayBinding="{Binding SelectionLabel, x:DataType=models:VoiceInfo}"
                             Title="Choose a voice" />
                     <Label Text="{Binding SelectedVoiceLanguage}" FontSize="12" TextColor="{DynamicResource SecondaryText}" />
                     <Label Text="{Binding SelectedVoiceGender}" FontSize="12" TextColor="{DynamicResource SecondaryText}" />
