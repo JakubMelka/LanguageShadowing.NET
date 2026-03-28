@@ -1,4 +1,4 @@
-﻿#if WINDOWS
+#if WINDOWS
 using System.Runtime.InteropServices;
 using System.Text;
 using LanguageShadowing.Core.Enums;
@@ -14,6 +14,8 @@ public sealed class WindowsSpeechRecognitionService : ISpeechRecognitionService
     private readonly StringBuilder _committedText = new();
     private SpeechRecognizer? _recognizer;
     private string _hypothesis = string.Empty;
+    private bool _suppressCompletedEvent;
+    private string? _completionMessageOverride;
 
     public bool IsAvailable => true;
 
@@ -27,8 +29,12 @@ public sealed class WindowsSpeechRecognitionService : ISpeechRecognitionService
     {
         try
         {
+            _suppressCompletedEvent = false;
+            _completionMessageOverride = null;
             PublishState(RecognitionStatus.Starting, "Requesting microphone access and initializing speech recognition...");
             var permission = await Permissions.RequestAsync<Permissions.Microphone>();
+            cancellationToken.ThrowIfCancellationRequested();
+
             if (permission != PermissionStatus.Granted)
             {
                 PublishState(RecognitionStatus.Error, "Microphone access was denied.");
@@ -36,6 +42,8 @@ public sealed class WindowsSpeechRecognitionService : ISpeechRecognitionService
             }
 
             await EnsureRecognizerAsync().ConfigureAwait(false);
+            cancellationToken.ThrowIfCancellationRequested();
+
             if (_recognizer is null)
             {
                 return;
@@ -44,8 +52,12 @@ public sealed class WindowsSpeechRecognitionService : ISpeechRecognitionService
             if (_recognizer.State == SpeechRecognizerState.Idle)
             {
                 await _recognizer.ContinuousRecognitionSession.StartAsync().AsTask(cancellationToken).ConfigureAwait(false);
+                cancellationToken.ThrowIfCancellationRequested();
                 PublishState(RecognitionStatus.Listening, "Microphone is listening.");
             }
+        }
+        catch (OperationCanceledException)
+        {
         }
         catch (COMException ex)
         {
@@ -67,18 +79,25 @@ public sealed class WindowsSpeechRecognitionService : ISpeechRecognitionService
         {
             if (_recognizer is not null && _recognizer.State != SpeechRecognizerState.Idle)
             {
+                _suppressCompletedEvent = false;
+                _completionMessageOverride = "Recognition stopped.";
                 PublishState(RecognitionStatus.Stopping, "Stopping recognition...");
                 await _recognizer.ContinuousRecognitionSession.StopAsync().AsTask(cancellationToken).ConfigureAwait(false);
+                return;
             }
 
+            _suppressCompletedEvent = false;
+            _completionMessageOverride = null;
             PublishState(RecognitionStatus.Completed, "Recognition stopped.");
         }
         catch (COMException ex)
         {
+            _completionMessageOverride = null;
             PublishState(RecognitionStatus.Error, MapComException(ex));
         }
         catch (Exception ex)
         {
+            _completionMessageOverride = null;
             PublishState(RecognitionStatus.Error, $"Could not stop speech recognition: {ex.Message}");
         }
     }
@@ -87,9 +106,12 @@ public sealed class WindowsSpeechRecognitionService : ISpeechRecognitionService
     {
         try
         {
-            if (_recognizer is not null && _recognizer.State != SpeechRecognizerState.Idle)
+            _completionMessageOverride = null;
+            _suppressCompletedEvent = _recognizer is not null && _recognizer.State != SpeechRecognizerState.Idle;
+
+            if (_suppressCompletedEvent)
             {
-                await _recognizer.ContinuousRecognitionSession.CancelAsync().AsTask(cancellationToken).ConfigureAwait(false);
+                await _recognizer!.ContinuousRecognitionSession.CancelAsync().AsTask(cancellationToken).ConfigureAwait(false);
             }
         }
         catch (COMException)
@@ -113,7 +135,10 @@ public sealed class WindowsSpeechRecognitionService : ISpeechRecognitionService
         {
             try
             {
-                if (_recognizer.State != SpeechRecognizerState.Idle)
+                _completionMessageOverride = null;
+                _suppressCompletedEvent = _recognizer.State != SpeechRecognizerState.Idle;
+
+                if (_suppressCompletedEvent)
                 {
                     await _recognizer.ContinuousRecognitionSession.CancelAsync();
                 }
@@ -191,9 +216,20 @@ public sealed class WindowsSpeechRecognitionService : ISpeechRecognitionService
 
     private void OnCompleted(SpeechContinuousRecognitionSession sender, SpeechContinuousRecognitionCompletedEventArgs args)
     {
-        PublishState(RecognitionStatus.Completed, args.Status == SpeechRecognitionResultStatus.Success
-            ? "Recognition completed."
-            : $"Recognition ended with status {args.Status}.");
+        if (_suppressCompletedEvent)
+        {
+            _suppressCompletedEvent = false;
+            _completionMessageOverride = null;
+            return;
+        }
+
+        var completionMessage = _completionMessageOverride;
+        _completionMessageOverride = null;
+        PublishState(RecognitionStatus.Completed, !string.IsNullOrWhiteSpace(completionMessage)
+            ? completionMessage
+            : args.Status == SpeechRecognitionResultStatus.Success
+                ? "Recognition completed."
+                : $"Recognition ended with status {args.Status}.");
     }
 
     private void PublishRecognition(string latestText, bool isFinal, double? confidence)
@@ -223,3 +259,4 @@ public sealed class WindowsSpeechRecognitionService : ISpeechRecognitionService
     }
 }
 #endif
+

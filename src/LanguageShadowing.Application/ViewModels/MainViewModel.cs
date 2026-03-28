@@ -34,8 +34,10 @@ public sealed class MainViewModel : ObservableObject
     private SpeechEngineCapabilities _capabilities = new(false, false, false, false, false, false);
     private SpeechSynthesisResult? _preparedSynthesis;
     private string? _preparedSignature;
+    private CancellationTokenSource? _recognitionStartCts;
     private bool _isInitialized;
     private bool _isBusy;
+    private int _playRequestVersion;
     private string _sourceText = string.Empty;
     private string _recognizedText = string.Empty;
     private VoiceInfo? _selectedVoice;
@@ -79,9 +81,9 @@ public sealed class MainViewModel : ObservableObject
             : "Speech recognition is not available on this platform";
 
         InitializeCommand = new AsyncRelayCommand(InitializeAsync, () => !_isInitialized && !IsBusy);
-        PlayCommand = new AsyncRelayCommand(PlayAsync, () => !IsBusy);
-        PauseCommand = new AsyncRelayCommand(PauseAsync, () => !IsBusy && CurrentPlaybackStatus == PlaybackStatus.Playing && Capabilities.SupportsPause);
-        StopCommand = new AsyncRelayCommand(StopAsync, () => !IsBusy && CurrentPlaybackStatus is PlaybackStatus.Playing or PlaybackStatus.Paused);
+        PlayCommand = new AsyncRelayCommand(PlayAsync, () => !IsBusy && _engine.Playback.CurrentState.Status != PlaybackStatus.Playing);
+        PauseCommand = new AsyncRelayCommand(PauseAsync, () => !IsBusy && _engine.Playback.CurrentState.Status == PlaybackStatus.Playing && Capabilities.SupportsPause);
+        StopCommand = new AsyncRelayCommand(StopAsync, () => !IsBusy && _engine.Playback.CurrentState.Status is PlaybackStatus.Playing or PlaybackStatus.Paused);
         RewindCommand = new AsyncRelayCommand(RewindAsync, () => !IsBusy && CanSeek);
         ResetCommand = new AsyncRelayCommand(ResetAsync, () => !IsBusy);
         OpenSpeechPrivacySettingsCommand = new AsyncRelayCommand(OpenSpeechPrivacySettingsAsync, () => ShowRecognitionSettingsButtons);
@@ -165,6 +167,8 @@ public sealed class MainViewModel : ObservableObject
             {
                 _preparedSignature = null;
                 _preparedSynthesis = null;
+                InvalidatePlayRequest();
+                CancelPendingRecognitionStart();
                 PositionSeconds = 0;
                 DurationSeconds = 0;
                 WaveformSamples = Array.Empty<float>();
@@ -240,9 +244,11 @@ public sealed class MainViewModel : ObservableObject
         set
         {
             var normalized = NormalizeThemeOption(value);
-            if (SetProperty(ref _selectedThemeOption, normalized))
+            var changed = SetProperty(ref _selectedThemeOption, normalized);
+            _themeService.ApplyTheme(MapThemeOption(normalized));
+
+            if (changed)
             {
-                _themeService.ApplyTheme(MapThemeOption(normalized));
                 PersistSettings();
             }
         }
@@ -307,6 +313,7 @@ public sealed class MainViewModel : ObservableObject
         {
             if (SetProperty(ref _isBusy, value))
             {
+                OnPropertyChanged(nameof(CanEditSourceText));
                 NotifyCommands();
             }
         }
@@ -319,7 +326,7 @@ public sealed class MainViewModel : ObservableObject
         {
             if (SetProperty(ref _currentPlaybackStatus, value))
             {
-                OnPropertyChanged(nameof(IsPlaying), nameof(IsPaused));
+                OnPropertyChanged(nameof(IsPlaying), nameof(IsPaused), nameof(CanEditSourceText));
                 NotifyCommands();
             }
         }
@@ -332,7 +339,7 @@ public sealed class MainViewModel : ObservableObject
         {
             if (SetProperty(ref _currentRecognitionStatus, value))
             {
-                OnPropertyChanged(nameof(IsRecognizing));
+                OnPropertyChanged(nameof(IsRecognizing), nameof(CanEditSourceText));
             }
         }
     }
@@ -344,6 +351,10 @@ public sealed class MainViewModel : ObservableObject
     public bool IsRecognizing => CurrentRecognitionStatus == RecognitionStatus.Listening || CurrentRecognitionStatus == RecognitionStatus.Starting;
 
     public bool CanSeek => Capabilities.SupportsSeek && DurationSeconds > 0;
+
+    public bool CanEditSourceText => !IsBusy
+        && _engine.Playback.CurrentState.Status is not (PlaybackStatus.Playing or PlaybackStatus.Paused)
+        && _engine.Recognition.CurrentStatus is not (RecognitionStatus.Starting or RecognitionStatus.Listening or RecognitionStatus.Stopping);
 
     public int? ShadowingScore
     {
@@ -434,10 +445,12 @@ public sealed class MainViewModel : ObservableObject
             await InitializeAsync().ConfigureAwait(false);
         }
 
+        var playRequestVersion = BeginPlayRequest();
         var requestSignature = BuildRequestSignature();
         var isResume = requestSignature == _preparedSignature && CurrentPlaybackStatus == PlaybackStatus.Paused;
         var requiresPreparation = requestSignature != _preparedSignature || _preparedSynthesis is null;
 
+        CancelPendingRecognitionStart();
         IsBusy = true;
         try
         {
@@ -461,17 +474,31 @@ public sealed class MainViewModel : ObservableObject
             StatusMessage = _engine.Recognition.IsAvailable
                 ? "Playback is running and the microphone is connecting."
                 : "Playback is running. Speech recognition is not available on this platform.";
-            await StartRecognitionIfAvailableAsync().ConfigureAwait(false);
             PersistSettings();
+
+            IsBusy = false;
+
+            if (!IsCurrentPlayRequest(playRequestVersion) || _engine.Playback.CurrentState.Status != PlaybackStatus.Playing)
+            {
+                return;
+            }
+
+            var recognitionStartToken = CreateRecognitionStartToken();
+            await StartRecognitionIfAvailableAsync(recognitionStartToken).ConfigureAwait(false);
         }
         finally
         {
-            IsBusy = false;
+            if (IsBusy)
+            {
+                IsBusy = false;
+            }
         }
     }
 
     public async Task PauseAsync()
     {
+        InvalidatePlayRequest();
+        CancelPendingRecognitionStart();
         IsBusy = true;
         try
         {
@@ -487,6 +514,8 @@ public sealed class MainViewModel : ObservableObject
 
     public async Task StopAsync()
     {
+        InvalidatePlayRequest();
+        CancelPendingRecognitionStart();
         IsBusy = true;
         try
         {
@@ -521,6 +550,8 @@ public sealed class MainViewModel : ObservableObject
 
     public async Task ResetAsync()
     {
+        InvalidatePlayRequest();
+        CancelPendingRecognitionStart();
         IsBusy = true;
         try
         {
@@ -559,14 +590,14 @@ public sealed class MainViewModel : ObservableObject
             : "Audio prepared.";
     }
 
-    private async Task StartRecognitionIfAvailableAsync()
+    private async Task StartRecognitionIfAvailableAsync(CancellationToken cancellationToken)
     {
         if (!_engine.Recognition.IsAvailable)
         {
             return;
         }
 
-        await _engine.Recognition.StartAsync().ConfigureAwait(false);
+        await _engine.Recognition.StartAsync(cancellationToken).ConfigureAwait(false);
     }
 
     private async Task StopRecognitionIfRunningAsync()
@@ -576,7 +607,7 @@ public sealed class MainViewModel : ObservableObject
             return;
         }
 
-        if (CurrentRecognitionStatus is RecognitionStatus.Listening or RecognitionStatus.Starting)
+        if (_engine.Recognition.CurrentStatus is RecognitionStatus.Listening or RecognitionStatus.Starting or RecognitionStatus.Stopping)
         {
             await _engine.Recognition.StopAsync().ConfigureAwait(false);
         }
@@ -590,6 +621,40 @@ public sealed class MainViewModel : ObservableObject
     private async Task OpenMicrophonePrivacySettingsAsync()
     {
         await _settingsLauncher.OpenAsync("ms-settings:privacy-microphone").ConfigureAwait(false);
+    }
+
+    private int BeginPlayRequest()
+    {
+        return Interlocked.Increment(ref _playRequestVersion);
+    }
+
+    private void InvalidatePlayRequest()
+    {
+        Interlocked.Increment(ref _playRequestVersion);
+    }
+
+    private bool IsCurrentPlayRequest(int playRequestVersion)
+    {
+        return Volatile.Read(ref _playRequestVersion) == playRequestVersion;
+    }
+
+    private CancellationToken CreateRecognitionStartToken()
+    {
+        CancelPendingRecognitionStart();
+        _recognitionStartCts = new CancellationTokenSource();
+        return _recognitionStartCts.Token;
+    }
+
+    private void CancelPendingRecognitionStart()
+    {
+        if (_recognitionStartCts is null)
+        {
+            return;
+        }
+
+        _recognitionStartCts.Cancel();
+        _recognitionStartCts.Dispose();
+        _recognitionStartCts = null;
     }
 
     private void ClearRecognizedText()
@@ -669,7 +734,8 @@ public sealed class MainViewModel : ObservableObject
             PositionSeconds = e.State.Position.TotalSeconds;
             DurationSeconds = Math.Max(DurationSeconds, e.State.Duration.TotalSeconds);
 
-            if (!string.IsNullOrWhiteSpace(e.State.Message))
+            if (!string.IsNullOrWhiteSpace(e.State.Message)
+                && e.State.Status is PlaybackStatus.Ready or PlaybackStatus.Completed or PlaybackStatus.Error)
             {
                 StatusMessage = e.State.Message;
             }
@@ -682,11 +748,6 @@ public sealed class MainViewModel : ObservableObject
         {
             CurrentRecognitionStatus = e.Status;
             RecognitionAvailabilityText = BuildRecognitionAvailabilityText(e.Status, e.Message);
-
-            if (!string.IsNullOrWhiteSpace(e.Message))
-            {
-                StatusMessage = e.Message;
-            }
         });
     }
 
@@ -757,3 +818,6 @@ public sealed class MainViewModel : ObservableObject
         };
     }
 }
+
+
+

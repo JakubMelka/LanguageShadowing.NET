@@ -7,11 +7,15 @@
             <Color x:Key="PageBackground">#F4F7FB</Color>
             <Color x:Key="CardBackground">#FFFFFF</Color>
             <Color x:Key="SurfaceMuted">#EEF2F8</Color>
+            <Color x:Key="SurfaceHover">#E2E8F2</Color>
             <Color x:Key="BorderColor">#D6DEEA</Color>
+            <Color x:Key="BorderHoverColor">#C1CBDC</Color>
             <Color x:Key="PrimaryText">#1B2430</Color>
             <Color x:Key="SecondaryText">#667286</Color>
             <Color x:Key="AccentColor">#2D7FF9</Color>
+            <Color x:Key="AccentHoverColor">#1F6EE3</Color>
             <Color x:Key="AccentSoft">#DCE9FF</Color>
+            <Color x:Key="AccentSoftHover">#C8DCFF</Color>
 
             <Style TargetType="ContentPage">
                 <Setter Property="BackgroundColor" Value="{DynamicResource PageBackground}" />
@@ -40,6 +44,19 @@
                 <Setter Property="CornerRadius" Value="14" />
                 <Setter Property="Padding" Value="16,10" />
                 <Setter Property="FontAttributes" Value="Bold" />
+                <Setter Property="VisualStateManager.VisualStateGroups">
+                    <VisualStateGroupList>
+                        <VisualStateGroup x:Name="CommonStates">
+                            <VisualState x:Name="Normal" />
+                            <VisualState x:Name="PointerOver">
+                                <VisualState.Setters>
+                                    <Setter Property="BackgroundColor" Value="{DynamicResource AccentSoftHover}" />
+                                </VisualState.Setters>
+                            </VisualState>
+                            <VisualState x:Name="Disabled" />
+                        </VisualStateGroup>
+                    </VisualStateGroupList>
+                </Setter>
             </Style>
 
             <Style x:Key="ToolbarButtonStyle" TargetType="Button">
@@ -50,12 +67,40 @@
                 <Setter Property="FontAttributes" Value="Bold" />
                 <Setter Property="BorderColor" Value="{DynamicResource BorderColor}" />
                 <Setter Property="BorderWidth" Value="1" />
+                <Setter Property="VisualStateManager.VisualStateGroups">
+                    <VisualStateGroupList>
+                        <VisualStateGroup x:Name="CommonStates">
+                            <VisualState x:Name="Normal" />
+                            <VisualState x:Name="PointerOver">
+                                <VisualState.Setters>
+                                    <Setter Property="BackgroundColor" Value="{DynamicResource SurfaceHover}" />
+                                    <Setter Property="BorderColor" Value="{DynamicResource BorderHoverColor}" />
+                                </VisualState.Setters>
+                            </VisualState>
+                            <VisualState x:Name="Disabled" />
+                        </VisualStateGroup>
+                    </VisualStateGroupList>
+                </Setter>
             </Style>
 
             <Style x:Key="ToolbarPrimaryButtonStyle" TargetType="Button" BasedOn="{StaticResource ToolbarButtonStyle}">
                 <Setter Property="BackgroundColor" Value="{DynamicResource AccentColor}" />
                 <Setter Property="TextColor" Value="White" />
                 <Setter Property="BorderColor" Value="{DynamicResource AccentColor}" />
+                <Setter Property="VisualStateManager.VisualStateGroups">
+                    <VisualStateGroupList>
+                        <VisualStateGroup x:Name="CommonStates">
+                            <VisualState x:Name="Normal" />
+                            <VisualState x:Name="PointerOver">
+                                <VisualState.Setters>
+                                    <Setter Property="BackgroundColor" Value="{DynamicResource AccentHoverColor}" />
+                                    <Setter Property="BorderColor" Value="{DynamicResource AccentHoverColor}" />
+                                </VisualState.Setters>
+                            </VisualState>
+                            <VisualState x:Name="Disabled" />
+                        </VisualStateGroup>
+                    </VisualStateGroupList>
+                </Setter>
             </Style>
 
             <Style TargetType="Editor">

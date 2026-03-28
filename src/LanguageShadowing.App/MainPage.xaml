@@ -45,6 +45,7 @@
                 <Editor x:Name="SourceEditor"
                         Grid.Row="2"
                         Text="{Binding SourceText}"
+                        IsEnabled="{Binding CanEditSourceText}"
                         AutoSize="Disabled"
                         MinimumHeightRequest="220"
                         VerticalOptions="FillAndExpand"
@@ -220,3 +221,4 @@
         </Border>
     </Grid>
 </ContentPage>
+
