@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="g1" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0%" stop-color="#1f2937"/>
+      <stop offset="100%" stop-color="#111827"/>
+    </linearGradient>
+    <linearGradient id="g2" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0%" stop-color="#2563eb"/>
+      <stop offset="100%" stop-color="#7c3aed"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#g1)"/>
+  <g transform="translate(20 6)">
+    <path d="M122 130c0-40 32-72 72-72h108c40 0 72 32 72 72v72c0 40-32 72-72 72h-78l-54 50c-8 7-20 2-20-9v-41h-16c-40 0-72-32-72-72z"
+          fill="#0f172a" opacity=".32"/>
+  </g>
+  <path d="M110 120c0-40 32-72 72-72h108c40 0 72 32 72 72v72c0 40-32 72-72 72h-78l-54 50c-8 7-20 2-20-9v-41h-16c-40 0-72-32-72-72z"
+        fill="white"/>
+  <path d="M210 173c38 0 69 31 69 69" fill="none" stroke="url(#g2)" stroke-width="18" stroke-linecap="round"/>
+  <path d="M180 173c55 0 99 44 99 99" fill="none" stroke="url(#g2)" stroke-width="18" stroke-linecap="round" opacity=".72"/>
+  <path d="M150 173c71 0 129 58 129 129" fill="none" stroke="url(#g2)" stroke-width="18" stroke-linecap="round" opacity=".42"/>
+  <circle cx="172" cy="173" r="14" fill="#111827"/>
+  <text x="256" y="430" text-anchor="middle" font-family="Inter, Arial, sans-serif" font-size="44" font-weight="700" fill="white" letter-spacing="6">LS</text>
+</svg>

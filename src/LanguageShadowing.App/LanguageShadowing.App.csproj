@@ -21,6 +21,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <MauiIcon Include="Resources\AppIcon\languageshadowinglogo.svg" />
+  </ItemGroup>
+
+  <ItemGroup>
     <MauiXaml Update="**\*.xaml" Generator="MSBuild:Compile" />
   </ItemGroup>
 
