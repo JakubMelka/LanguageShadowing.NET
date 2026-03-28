@@ -145,8 +145,7 @@
                             Grid.Row="0"
                             Margin="8,0"
                             Minimum="0"
-                            Maximum="{Binding ProgressMaximum}"
-                            Value="{Binding PositionSeconds, Mode=OneWay}"
+                            DragStarted="OnProgressDragStarted"
                             DragCompleted="OnProgressDragCompleted"
                             BackgroundColor="Transparent" />
                     <Grid Grid.Row="1" ColumnDefinitions="Auto,*,Auto">
