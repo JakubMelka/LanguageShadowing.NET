@@ -27,6 +27,7 @@ public sealed class MainViewModel : ObservableObject
     private readonly IShadowingAnalyzer _analyzer;
     private readonly IAppDispatcher _dispatcher;
     private readonly IAppThemeService _themeService;
+    private readonly ISettingsLauncher _settingsLauncher;
     private readonly ObservableCollection<VoiceInfo> _voices = new();
     private readonly ObservableCollection<string> _engines = new();
     private IReadOnlyList<float> _waveformSamples = Array.Empty<float>();
@@ -46,6 +47,7 @@ public sealed class MainViewModel : ObservableObject
     private double _positionSeconds;
     private double _durationSeconds;
     private string _statusMessage = "Ready.";
+    private string _recognitionAvailabilityText = "Speech recognition is available, but not started.";
     private string _shadowingSummary = "The score will appear after recognition starts.";
     private string _scoreColorHex = "#A0A7B8";
     private int? _shadowingScore;
@@ -57,19 +59,24 @@ public sealed class MainViewModel : ObservableObject
         IShadowingSettingsStore settingsStore,
         IShadowingAnalyzer analyzer,
         IAppDispatcher dispatcher,
-        IAppThemeService themeService)
+        IAppThemeService themeService,
+        ISettingsLauncher settingsLauncher)
     {
         _engine = engine;
         _settingsStore = settingsStore;
         _analyzer = analyzer;
         _dispatcher = dispatcher;
         _themeService = themeService;
+        _settingsLauncher = settingsLauncher;
         Voices = AsReadOnly(_voices);
         Engines = AsReadOnly(_engines);
         ThemeOptions = AvailableThemeOptions;
 
         _engines.Add(_engine.Name);
         _selectedEngineName = _engine.Name;
+        _recognitionAvailabilityText = _engine.Recognition.IsAvailable
+            ? "Speech recognition is available, but not started."
+            : "Speech recognition is not available on this platform";
 
         InitializeCommand = new AsyncRelayCommand(InitializeAsync, () => !_isInitialized && !IsBusy);
         PlayCommand = new AsyncRelayCommand(PlayAsync, () => !IsBusy);
@@ -77,6 +84,8 @@ public sealed class MainViewModel : ObservableObject
         StopCommand = new AsyncRelayCommand(StopAsync, () => !IsBusy && CurrentPlaybackStatus is PlaybackStatus.Playing or PlaybackStatus.Paused);
         RewindCommand = new AsyncRelayCommand(RewindAsync, () => !IsBusy && CanSeek);
         ResetCommand = new AsyncRelayCommand(ResetAsync, () => !IsBusy);
+        OpenSpeechPrivacySettingsCommand = new AsyncRelayCommand(OpenSpeechPrivacySettingsAsync, () => ShowRecognitionSettingsButtons);
+        OpenMicrophonePrivacySettingsCommand = new AsyncRelayCommand(OpenMicrophonePrivacySettingsAsync, () => ShowRecognitionSettingsButtons);
         ClearRecognizedCommand = new RelayCommand(ClearRecognizedText);
 
         _engine.Playback.StateChanged += OnPlaybackStateChanged;
@@ -102,6 +111,10 @@ public sealed class MainViewModel : ObservableObject
 
     public AsyncRelayCommand ResetCommand { get; }
 
+    public AsyncRelayCommand OpenSpeechPrivacySettingsCommand { get; }
+
+    public AsyncRelayCommand OpenMicrophonePrivacySettingsCommand { get; }
+
     public RelayCommand ClearRecognizedCommand { get; }
 
     public SpeechEngineCapabilities Capabilities
@@ -111,7 +124,7 @@ public sealed class MainViewModel : ObservableObject
         {
             if (SetProperty(ref _capabilities, value))
             {
-                OnPropertyChanged(nameof(CanSeek), nameof(RecognitionAvailabilityText));
+                OnPropertyChanged(nameof(CanSeek));
                 NotifyCommands();
             }
         }
@@ -279,6 +292,14 @@ public sealed class MainViewModel : ObservableObject
         private set => SetProperty(ref _statusMessage, value);
     }
 
+    public string RecognitionAvailabilityText
+    {
+        get => _recognitionAvailabilityText;
+        private set => SetProperty(ref _recognitionAvailabilityText, value);
+    }
+
+    public bool ShowRecognitionSettingsButtons => _engine.Recognition.IsAvailable;
+
     public bool IsBusy
     {
         get => _isBusy;
@@ -311,7 +332,7 @@ public sealed class MainViewModel : ObservableObject
         {
             if (SetProperty(ref _currentRecognitionStatus, value))
             {
-                OnPropertyChanged(nameof(IsRecognizing), nameof(RecognitionAvailabilityText));
+                OnPropertyChanged(nameof(IsRecognizing));
             }
         }
     }
@@ -323,10 +344,6 @@ public sealed class MainViewModel : ObservableObject
     public bool IsRecognizing => CurrentRecognitionStatus == RecognitionStatus.Listening || CurrentRecognitionStatus == RecognitionStatus.Starting;
 
     public bool CanSeek => Capabilities.SupportsSeek && DurationSeconds > 0;
-
-    public string RecognitionAvailabilityText => _engine.Recognition.IsAvailable
-        ? (IsRecognizing ? "Microphone is listening" : "Microphone is ready")
-        : "Speech recognition is not available on this platform";
 
     public int? ShadowingScore
     {
@@ -387,6 +404,10 @@ public sealed class MainViewModel : ObservableObject
                     ?? _voices.FirstOrDefault(v => v.IsDefault)
                     ?? _voices.FirstOrDefault();
             }).ConfigureAwait(false);
+
+            RecognitionAvailabilityText = _engine.Recognition.IsAvailable
+                ? "Speech recognition is available, but not started."
+                : "Speech recognition is not available on this platform";
 
             StatusMessage = _voices.Count == 0
                 ? "No voices were found."
@@ -561,6 +582,16 @@ public sealed class MainViewModel : ObservableObject
         }
     }
 
+    private async Task OpenSpeechPrivacySettingsAsync()
+    {
+        await _settingsLauncher.OpenAsync("ms-settings:privacy-speech").ConfigureAwait(false);
+    }
+
+    private async Task OpenMicrophonePrivacySettingsAsync()
+    {
+        await _settingsLauncher.OpenAsync("ms-settings:privacy-microphone").ConfigureAwait(false);
+    }
+
     private void ClearRecognizedText()
     {
         RecognizedText = string.Empty;
@@ -625,6 +656,8 @@ public sealed class MainViewModel : ObservableObject
         StopCommand.NotifyCanExecuteChanged();
         RewindCommand.NotifyCanExecuteChanged();
         ResetCommand.NotifyCanExecuteChanged();
+        OpenSpeechPrivacySettingsCommand.NotifyCanExecuteChanged();
+        OpenMicrophonePrivacySettingsCommand.NotifyCanExecuteChanged();
         ClearRecognizedCommand.NotifyCanExecuteChanged();
     }
 
@@ -648,6 +681,8 @@ public sealed class MainViewModel : ObservableObject
         _ = _dispatcher.RunAsync(() =>
         {
             CurrentRecognitionStatus = e.Status;
+            RecognitionAvailabilityText = BuildRecognitionAvailabilityText(e.Status, e.Message);
+
             if (!string.IsNullOrWhiteSpace(e.Message))
             {
                 StatusMessage = e.Message;
@@ -662,6 +697,34 @@ public sealed class MainViewModel : ObservableObject
             RecognizedText = e.Update.FullText;
             UpdateAssessment();
         });
+    }
+
+    private string BuildRecognitionAvailabilityText(RecognitionStatus status, string? message)
+    {
+        if (!_engine.Recognition.IsAvailable)
+        {
+            return "Speech recognition is not available on this platform";
+        }
+
+        return status switch
+        {
+            RecognitionStatus.Starting => string.IsNullOrWhiteSpace(message)
+                ? "Requesting microphone access and initializing speech recognition..."
+                : message,
+            RecognitionStatus.Listening => string.IsNullOrWhiteSpace(message)
+                ? "Microphone is listening."
+                : message,
+            RecognitionStatus.Stopping => string.IsNullOrWhiteSpace(message)
+                ? "Stopping recognition..."
+                : message,
+            RecognitionStatus.Completed => string.IsNullOrWhiteSpace(message)
+                ? "Recognition stopped."
+                : message,
+            RecognitionStatus.Error => string.IsNullOrWhiteSpace(message)
+                ? "Speech recognition is unavailable."
+                : message,
+            _ => "Speech recognition is available, but not started."
+        };
     }
 
     private static string NormalizeThemeOption(string? option)

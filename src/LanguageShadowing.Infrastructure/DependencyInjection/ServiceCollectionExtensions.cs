@@ -16,6 +16,7 @@ public static class ServiceCollectionExtensions
     {
         services.AddSingleton<IAppDispatcher, MauiAppDispatcher>();
         services.AddSingleton<IAppThemeService, MauiAppThemeService>();
+        services.AddSingleton<ISettingsLauncher, MauiSettingsLauncher>();
         services.AddSingleton<IShadowingSettingsStore, PreferencesSettingsStore>();
         services.AddSingleton<SegmentedSpeechPlanner>();
         services.AddSingleton<WaveformFactory>();
