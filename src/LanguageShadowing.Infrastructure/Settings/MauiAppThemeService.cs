@@ -4,8 +4,14 @@ using Microsoft.Maui.Graphics;
 
 namespace LanguageShadowing.Infrastructure.Settings;
 
+/// <summary>
+/// Applies the application's theme preference and updates the shared resource palette.
+/// </summary>
 public sealed class MauiAppThemeService : IAppThemeService
 {
+    /// <summary>
+    /// Applies the requested theme immediately.
+    /// </summary>
     public void ApplyTheme(ThemePreferenceMode preference)
     {
         if (Microsoft.Maui.Controls.Application.Current is null)
@@ -25,6 +31,9 @@ public sealed class MauiAppThemeService : IAppThemeService
         ApplyThemePalette(app, theme == AppTheme.Unspecified ? app.RequestedTheme : theme);
     }
 
+    /// <summary>
+    /// Updates all resource entries that depend on the active theme.
+    /// </summary>
     private static void ApplyThemePalette(Microsoft.Maui.Controls.Application app, AppTheme theme)
     {
         var isDark = theme == AppTheme.Dark;

@@ -1,11 +1,15 @@
-﻿using LanguageShadowing.Core.Interfaces;
+using LanguageShadowing.Core.Interfaces;
 using LanguageShadowing.Core.Models;
 using Microsoft.Maui.Media;
 
 namespace LanguageShadowing.Infrastructure.Synthesis;
 
+/// <summary>
+/// Retrieves the voices exposed by the current platform.
+/// </summary>
 public sealed class BuiltInVoiceCatalogService : IVoiceCatalogService
 {
+    /// <inheritdoc />
     public async Task<IReadOnlyList<VoiceInfo>> GetVoicesAsync(CancellationToken cancellationToken = default)
     {
 #if WINDOWS

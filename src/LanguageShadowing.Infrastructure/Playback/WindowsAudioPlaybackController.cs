@@ -8,6 +8,25 @@ using Windows.Storage.Streams;
 
 namespace LanguageShadowing.Infrastructure.Playback;
 
+/// <summary>
+/// Windows playback controller backed by <see cref="MediaPlayer"/>.
+/// </summary>
+/// <remarks>
+/// <para>
+/// This type is the Windows-specific translation layer between native media playback and the application's neutral
+/// <see cref="PlaybackState"/> model.
+/// </para>
+/// <para>
+/// The rest of the application should never have to know about <see cref="MediaPlayer"/>, playback sessions, random
+/// access streams, or native event timing. Instead, the controller exposes one current snapshot and one event that says
+/// "here is the newest playback state I know about".
+/// </para>
+/// <para>
+/// The class is intentionally event-driven. Windows playback position changes are discovered through
+/// <see cref="MediaPlaybackSession.PositionChanged"/>, not by polling. That keeps the progress pipeline responsive while
+/// avoiding an extra timer in application code.
+/// </para>
+/// </remarks>
 public sealed class WindowsAudioPlaybackController : IAudioPlaybackController
 {
     private readonly MediaPlayer _player;
@@ -15,6 +34,9 @@ public sealed class WindowsAudioPlaybackController : IAudioPlaybackController
     private SpeechSynthesisResult? _loaded;
     private PlaybackState _state = PlaybackState.Idle;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="WindowsAudioPlaybackController"/> class and subscribes to native playback events.
+    /// </summary>
     public WindowsAudioPlaybackController()
     {
         _player = new MediaPlayer();
@@ -24,10 +46,13 @@ public sealed class WindowsAudioPlaybackController : IAudioPlaybackController
         _player.PlaybackSession.NaturalDurationChanged += OnNaturalDurationChanged;
     }
 
+    /// <inheritdoc />
     public PlaybackState CurrentState => _state;
 
+    /// <inheritdoc />
     public event EventHandler<PlaybackStateChangedEventArgs>? StateChanged;
 
+    /// <inheritdoc />
     public async Task LoadAsync(SpeechSynthesisResult synthesisResult, CancellationToken cancellationToken = default)
     {
         await DisposeStreamAsync().ConfigureAwait(false);
@@ -52,6 +77,7 @@ public sealed class WindowsAudioPlaybackController : IAudioPlaybackController
         Publish(new PlaybackState(PlaybackStatus.Ready, TimeSpan.Zero, synthesisResult.Duration, true, false, "Audio prepared."));
     }
 
+    /// <inheritdoc />
     public Task PlayAsync(CancellationToken cancellationToken = default)
     {
         if (_loaded is null)
@@ -71,6 +97,7 @@ public sealed class WindowsAudioPlaybackController : IAudioPlaybackController
         return Task.CompletedTask;
     }
 
+    /// <inheritdoc />
     public Task PauseAsync(CancellationToken cancellationToken = default)
     {
         _player.Pause();
@@ -85,6 +112,7 @@ public sealed class WindowsAudioPlaybackController : IAudioPlaybackController
         return Task.CompletedTask;
     }
 
+    /// <inheritdoc />
     public Task StopAsync(CancellationToken cancellationToken = default)
     {
         _player.Pause();
@@ -93,6 +121,7 @@ public sealed class WindowsAudioPlaybackController : IAudioPlaybackController
         return Task.CompletedTask;
     }
 
+    /// <inheritdoc />
     public async Task ResetAsync(CancellationToken cancellationToken = default)
     {
         await StopAsync(cancellationToken).ConfigureAwait(false);
@@ -102,6 +131,7 @@ public sealed class WindowsAudioPlaybackController : IAudioPlaybackController
         Publish(PlaybackState.Idle);
     }
 
+    /// <inheritdoc />
     public Task SeekAsync(TimeSpan position, CancellationToken cancellationToken = default)
     {
         if (_loaded is null)
@@ -120,6 +150,7 @@ public sealed class WindowsAudioPlaybackController : IAudioPlaybackController
         return Task.CompletedTask;
     }
 
+    /// <inheritdoc />
     public async ValueTask DisposeAsync()
     {
         _player.PlaybackSession.PositionChanged -= OnPositionChanged;
@@ -128,6 +159,9 @@ public sealed class WindowsAudioPlaybackController : IAudioPlaybackController
         await DisposeStreamAsync().ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// Reacts to native position updates and republishes them as immutable application snapshots.
+    /// </summary>
     private void OnPositionChanged(MediaPlaybackSession sender, object args)
     {
         if (_loaded is null)
@@ -142,6 +176,9 @@ public sealed class WindowsAudioPlaybackController : IAudioPlaybackController
         });
     }
 
+    /// <summary>
+    /// Updates the known duration when Windows reports a more accurate natural media duration.
+    /// </summary>
     private void OnNaturalDurationChanged(MediaPlaybackSession sender, object args)
     {
         if (_loaded is null)
@@ -163,12 +200,18 @@ public sealed class WindowsAudioPlaybackController : IAudioPlaybackController
         Publish(_state with { Status = PlaybackStatus.Error, IsBusy = false, Message = args.ErrorMessage });
     }
 
+    /// <summary>
+    /// Stores the latest playback snapshot and broadcasts it to consumers.
+    /// </summary>
     private void Publish(PlaybackState state)
     {
         _state = state;
         StateChanged?.Invoke(this, new PlaybackStateChangedEventArgs(state));
     }
 
+    /// <summary>
+    /// Releases the current in-memory audio stream, if any.
+    /// </summary>
     private async Task DisposeStreamAsync()
     {
         if (_currentStream is not null)

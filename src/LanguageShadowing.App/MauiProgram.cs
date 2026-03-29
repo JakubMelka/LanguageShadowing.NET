@@ -4,8 +4,14 @@ using LanguageShadowing.Infrastructure.DependencyInjection;
 
 namespace LanguageShadowing.App;
 
+/// <summary>
+/// Creates and configures the MAUI host for the application.
+/// </summary>
 public static class MauiProgram
 {
+    /// <summary>
+    /// Builds the MAUI application container.
+    /// </summary>
     public static MauiApp CreateMauiApp()
     {
         var builder = MauiApp.CreateBuilder();

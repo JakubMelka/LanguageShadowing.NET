@@ -10,8 +10,14 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace LanguageShadowing.Infrastructure.DependencyInjection;
 
+/// <summary>
+/// Registers the application's infrastructure services.
+/// </summary>
 public static class ServiceCollectionExtensions
 {
+    /// <summary>
+    /// Adds the platform-specific infrastructure services required by the shadowing application.
+    /// </summary>
     public static IServiceCollection AddLanguageShadowingInfrastructure(this IServiceCollection services)
     {
         services.AddSingleton<IAppDispatcher, MauiAppDispatcher>();

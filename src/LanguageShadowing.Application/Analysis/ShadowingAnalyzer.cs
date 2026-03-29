@@ -1,13 +1,24 @@
-﻿using System.Text;
+using System.Text;
 using System.Text.RegularExpressions;
 using LanguageShadowing.Core.Models;
 
 namespace LanguageShadowing.Application.Analysis;
 
+/// <summary>
+/// Compares the source text with the recognized transcript by using tokenization and a longest-common-subsequence pass.
+/// </summary>
+/// <remarks>
+/// The implementation intentionally favors determinism and transparency over linguistic sophistication.
+/// The app needs a lightweight score that can be recalculated on every recognition update without introducing async work,
+/// allocations for large intermediate objects, or platform-specific dependencies.
+/// </remarks>
 public sealed class ShadowingAnalyzer : IShadowingAnalyzer
 {
     private static readonly Regex TokenRegex = new("[\\p{L}\\p{N}']+", RegexOptions.Compiled);
 
+    /// <summary>
+    /// Produces a score and mismatch summary for the current recognition output.
+    /// </summary>
     public ShadowingAssessment Assess(string sourceText, string recognizedText)
     {
         if (string.IsNullOrWhiteSpace(sourceText))
@@ -115,4 +126,3 @@ public sealed class ShadowingAnalyzer : IShadowingAnalyzer
         return builder.ToString();
     }
 }
-

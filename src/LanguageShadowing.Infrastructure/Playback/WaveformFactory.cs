@@ -3,10 +3,19 @@ using LanguageShadowing.Core.Models;
 
 namespace LanguageShadowing.Infrastructure.Playback;
 
+/// <summary>
+/// Creates waveform previews either from decoded WAV payloads or from estimated segment metadata.
+/// </summary>
 public sealed class WaveformFactory
 {
+    /// <summary>
+    /// The default number of visual samples used by the waveform control.
+    /// </summary>
     public const int SampleCount = 144;
 
+    /// <summary>
+    /// Creates an estimated waveform when real audio samples are unavailable.
+    /// </summary>
     public WaveformData CreateEstimated(IReadOnlyList<SpeechSegment> segments, int sampleCount)
     {
         if (segments.Count == 0)
@@ -26,6 +35,9 @@ public sealed class WaveformFactory
         return new WaveformData(samples, true);
     }
 
+    /// <summary>
+    /// Attempts to derive waveform data and duration from a 16-bit PCM WAV payload.
+    /// </summary>
     public bool TryCreateFromWave(byte[] audioBytes, int sampleCount, out WaveformData waveform, out TimeSpan duration)
     {
         waveform = WaveformData.Empty;

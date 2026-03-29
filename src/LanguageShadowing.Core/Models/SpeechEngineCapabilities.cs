@@ -1,5 +1,8 @@
-﻿namespace LanguageShadowing.Core.Models;
+namespace LanguageShadowing.Core.Models;
 
+/// <summary>
+/// Describes the capabilities of a concrete speech engine implementation.
+/// </summary>
 public sealed record SpeechEngineCapabilities(
     bool SupportsSeek,
     bool SupportsPause,

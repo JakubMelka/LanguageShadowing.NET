@@ -1,12 +1,18 @@
-﻿using System.Text.RegularExpressions;
+using System.Text.RegularExpressions;
 using LanguageShadowing.Core.Models;
 
 namespace LanguageShadowing.Infrastructure.Playback;
 
+/// <summary>
+/// Splits text into coarse speech segments and estimates their timing.
+/// </summary>
 public sealed class SegmentedSpeechPlanner
 {
     private static readonly Regex SentenceSeparatorRegex = new("(?<=[\\.!?;:])\\s+|\\r?\\n+", RegexOptions.Compiled);
 
+    /// <summary>
+    /// Creates segments from the supplied text.
+    /// </summary>
     public IReadOnlyList<SpeechSegment> CreateSegments(string text, double speechRate)
     {
         var normalized = text.Trim();
@@ -49,6 +55,9 @@ public sealed class SegmentedSpeechPlanner
         return segments;
     }
 
+    /// <summary>
+    /// Estimates the total duration from the final segment end.
+    /// </summary>
     public TimeSpan EstimateDuration(IReadOnlyList<SpeechSegment> segments)
     {
         if (segments.Count == 0)

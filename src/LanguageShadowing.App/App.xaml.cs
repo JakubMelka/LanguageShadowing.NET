@@ -3,10 +3,16 @@ using Microsoft.Maui.Graphics;
 
 namespace LanguageShadowing.App;
 
+/// <summary>
+/// Application entry point responsible for creating the main window and keeping the runtime palette in sync.
+/// </summary>
 public partial class App : Microsoft.Maui.Controls.Application
 {
     private readonly IServiceProvider _serviceProvider;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="App"/> class.
+    /// </summary>
     public App(IServiceProvider serviceProvider)
     {
         InitializeComponent();
@@ -15,6 +21,9 @@ public partial class App : Microsoft.Maui.Controls.Application
         RequestedThemeChanged += OnRequestedThemeChanged;
     }
 
+    /// <summary>
+    /// Creates the main application window.
+    /// </summary>
     protected override Window CreateWindow(IActivationState? activationState)
     {
         var mainPage = _serviceProvider.GetRequiredService<MainPage>();

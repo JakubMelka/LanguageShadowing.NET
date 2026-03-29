@@ -3,6 +3,9 @@ using Microsoft.Maui.Storage;
 
 namespace LanguageShadowing.Infrastructure.Settings;
 
+/// <summary>
+/// Stores user settings in MAUI preferences.
+/// </summary>
 public sealed class PreferencesSettingsStore : IShadowingSettingsStore
 {
     private const string VoiceIdKey = "preferred_voice_id";
@@ -11,6 +14,9 @@ public sealed class PreferencesSettingsStore : IShadowingSettingsStore
     private const string SpeechVolumeKey = "speech_volume";
     private const string ThemePreferenceKey = "theme_preference";
 
+    /// <summary>
+    /// Loads the persisted settings snapshot.
+    /// </summary>
     public Task<ShadowingSettings> LoadAsync(CancellationToken cancellationToken = default)
     {
         var voiceId = Preferences.Default.Get<string?>(VoiceIdKey, null);
@@ -25,6 +31,9 @@ public sealed class PreferencesSettingsStore : IShadowingSettingsStore
         return Task.FromResult(new ShadowingSettings(voiceId, speechRate, speechPitch, speechVolume, parsedTheme));
     }
 
+    /// <summary>
+    /// Saves the supplied settings snapshot.
+    /// </summary>
     public Task SaveAsync(ShadowingSettings settings, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(settings.PreferredVoiceId))

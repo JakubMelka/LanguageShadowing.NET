@@ -7,17 +7,24 @@ using Windows.Media.SpeechSynthesis;
 
 namespace LanguageShadowing.Infrastructure.Synthesis;
 
+/// <summary>
+/// Windows implementation that uses <see cref="SpeechSynthesizer"/> to generate real audio payloads.
+/// </summary>
 public sealed class WindowsTextToSpeechService : ITextToSpeechService
 {
     private readonly SegmentedSpeechPlanner _planner;
     private readonly WaveformFactory _waveformFactory;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="WindowsTextToSpeechService"/> class.
+    /// </summary>
     public WindowsTextToSpeechService(SegmentedSpeechPlanner planner, WaveformFactory waveformFactory)
     {
         _planner = planner;
         _waveformFactory = waveformFactory;
     }
 
+    /// <inheritdoc />
     public async Task<SpeechSynthesisResult> PrepareAsync(SpeechSynthesisRequest request, CancellationToken cancellationToken = default)
     {
         var segments = _planner.CreateSegments(request.Text, request.Rate);
@@ -45,6 +52,8 @@ public sealed class WindowsTextToSpeechService : ITextToSpeechService
         var hasWaveform = _waveformFactory.TryCreateFromWave(bytes, WaveformFactory.SampleCount, out var waveform, out var actualDuration);
         if (!hasWaveform)
         {
+            // Some platform payloads are valid for playback but awkward to analyze. In that case the application still
+            // prefers real audio for playback and falls back only for visualization metadata.
             waveform = _waveformFactory.CreateEstimated(segments, WaveformFactory.SampleCount);
             actualDuration = estimatedDuration;
         }
