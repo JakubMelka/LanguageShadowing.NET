@@ -115,9 +115,9 @@ public sealed class MainViewModel : ObservableObject
             : "Speech recognition is not available on this platform";
 
         InitializeCommand = new AsyncRelayCommand(InitializeAsync, () => !_isInitialized && !IsBusy);
-        PlayCommand = new AsyncRelayCommand(PlayAsync, () => !IsBusy && _engine.Playback.CurrentState.Status != PlaybackStatus.Playing);
-        PauseCommand = new AsyncRelayCommand(PauseAsync, () => !IsBusy && _engine.Playback.CurrentState.Status == PlaybackStatus.Playing && Capabilities.SupportsPause);
-        StopCommand = new AsyncRelayCommand(StopAsync, () => !IsBusy && _engine.Playback.CurrentState.Status is PlaybackStatus.Playing or PlaybackStatus.Paused);
+        PlayCommand = new AsyncRelayCommand(PlayAsync, () => !IsBusy && CurrentPlaybackStatus != PlaybackStatus.Playing);
+        PauseCommand = new AsyncRelayCommand(PauseAsync, () => !IsBusy && CurrentPlaybackStatus == PlaybackStatus.Playing && Capabilities.SupportsPause);
+        StopCommand = new AsyncRelayCommand(StopAsync, () => !IsBusy && CurrentPlaybackStatus is PlaybackStatus.Playing or PlaybackStatus.Paused);
         RewindCommand = new AsyncRelayCommand(RewindAsync, () => !IsBusy && CanSeek);
         ResetCommand = new AsyncRelayCommand(ResetAsync, () => !IsBusy);
         ToggleDictationCommand = new AsyncRelayCommand(ToggleDictationAsync, () => CanToggleDictation);
@@ -945,4 +945,6 @@ public sealed class MainViewModel : ObservableObject
         };
     }
 }
+
+
 
