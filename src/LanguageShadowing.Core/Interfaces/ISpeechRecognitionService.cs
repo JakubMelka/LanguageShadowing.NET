@@ -48,4 +48,11 @@ public interface ISpeechRecognitionService : IAsyncDisposable
     /// Clears local transcript state and returns the recognizer to an idle baseline.
     /// </summary>
     Task ResetAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Clears the accumulated transcript without forcing the recognizer to stop listening.
+    /// </summary>
+    Task ClearTranscriptAsync(CancellationToken cancellationToken = default);
 }
+
+

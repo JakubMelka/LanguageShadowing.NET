@@ -55,6 +55,13 @@ public sealed class UnsupportedSpeechRecognitionService : ISpeechRecognitionServ
     }
 
     /// <inheritdoc />
+    public Task ClearTranscriptAsync(CancellationToken cancellationToken = default)
+    {
+        RecognitionUpdated?.Invoke(this, new RecognitionUpdatedEventArgs(new RecognitionUpdate(string.Empty, string.Empty, true)));
+        return Task.CompletedTask;
+    }
+
+    /// <inheritdoc />
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     private void PublishState(RecognitionStatus status, string message)
@@ -63,3 +70,5 @@ public sealed class UnsupportedSpeechRecognitionService : ISpeechRecognitionServ
         StateChanged?.Invoke(this, new RecognitionStateChangedEventArgs(status, message));
     }
 }
+
+

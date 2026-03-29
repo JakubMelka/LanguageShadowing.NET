@@ -12,6 +12,7 @@ public sealed class PreferencesSettingsStore : IShadowingSettingsStore
     private const string SpeechRateKey = "speech_rate";
     private const string SpeechPitchKey = "speech_pitch";
     private const string SpeechVolumeKey = "speech_volume";
+    private const string DictationEnabledKey = "dictation_enabled";
     private const string ThemePreferenceKey = "theme_preference";
 
     /// <summary>
@@ -23,12 +24,13 @@ public sealed class PreferencesSettingsStore : IShadowingSettingsStore
         var speechRate = Preferences.Default.Get(SpeechRateKey, 1.0);
         var speechPitch = Preferences.Default.Get(SpeechPitchKey, 1.0);
         var speechVolume = Preferences.Default.Get(SpeechVolumeKey, 1.0);
+        var isDictationEnabled = Preferences.Default.Get(DictationEnabledKey, false);
         var themePreference = Preferences.Default.Get(ThemePreferenceKey, nameof(ThemePreferenceMode.System));
         var parsedTheme = Enum.TryParse<ThemePreferenceMode>(themePreference, out var value)
             ? value
             : ThemePreferenceMode.System;
 
-        return Task.FromResult(new ShadowingSettings(voiceId, speechRate, speechPitch, speechVolume, parsedTheme));
+        return Task.FromResult(new ShadowingSettings(voiceId, speechRate, speechPitch, speechVolume, isDictationEnabled, parsedTheme));
     }
 
     /// <summary>
@@ -48,7 +50,10 @@ public sealed class PreferencesSettingsStore : IShadowingSettingsStore
         Preferences.Default.Set(SpeechRateKey, settings.SpeechRate);
         Preferences.Default.Set(SpeechPitchKey, settings.SpeechPitch);
         Preferences.Default.Set(SpeechVolumeKey, settings.SpeechVolume);
+        Preferences.Default.Set(DictationEnabledKey, settings.IsDictationEnabled);
         Preferences.Default.Set(ThemePreferenceKey, settings.ThemePreference.ToString());
         return Task.CompletedTask;
     }
 }
+
+

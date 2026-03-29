@@ -127,6 +127,9 @@
                            FontSize="12" />
                     <HorizontalStackLayout Spacing="10"
                                            IsVisible="{Binding ShowRecognitionSettingsButtons}">
+                        <Button Text="{Binding DictationButtonText}"
+                                Style="{StaticResource ToolbarPrimaryButtonStyle}"
+                                Command="{Binding ToggleDictationCommand}" />
                         <Button Text="Speech Settings"
                                 Style="{StaticResource ToolbarButtonStyle}"
                                 Command="{Binding OpenSpeechPrivacySettingsCommand}" />
@@ -221,4 +224,5 @@
         </Border>
     </Grid>
 </ContentPage>
+
 

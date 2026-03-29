@@ -162,6 +162,15 @@ public sealed class WindowsSpeechRecognitionService : ISpeechRecognitionService
     }
 
     /// <inheritdoc />
+    public Task ClearTranscriptAsync(CancellationToken cancellationToken = default)
+    {
+        _committedText.Clear();
+        _hypothesis = string.Empty;
+        RecognitionUpdated?.Invoke(this, new RecognitionUpdatedEventArgs(new RecognitionUpdate(string.Empty, string.Empty, true)));
+        return Task.CompletedTask;
+    }
+
+    /// <inheritdoc />
     public async ValueTask DisposeAsync()
     {
         if (_recognizer is not null)
@@ -320,3 +329,5 @@ public sealed class WindowsSpeechRecognitionService : ISpeechRecognitionService
     }
 }
 #endif
+
+

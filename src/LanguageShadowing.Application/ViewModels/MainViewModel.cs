@@ -26,19 +26,18 @@ namespace LanguageShadowing.Application.ViewModels;
 /// <item><description>the view model may need to initialize settings and available voices,</description></item>
 /// <item><description>it may need to synthesize fresh audio,</description></item>
 /// <item><description>it then starts playback,</description></item>
-/// <item><description>and only after playback really belongs to the current user request does it try to start recognition.</description></item>
+/// <item><description>and separately it may start or stop dictation based on the dedicated microphone toggle.</description></item>
 /// </list>
 /// <para>
 /// Meanwhile, playback and recognition continue to publish their own events from outside the command flow. Those events
 /// may arrive later, on other threads, and in a different order than the original button click that triggered them.
 /// </para>
 /// <para>
-/// To keep that manageable, the class uses three important coordination mechanisms:
+/// To keep that manageable, the class uses two important coordination mechanisms:
 /// </para>
 /// <list type="bullet">
 /// <item><description><see cref="IAppDispatcher"/> folds external callbacks back onto the UI thread before bindable properties are changed.</description></item>
-/// <item><description>A monotonically increasing play-request version invalidates stale async continuations from older Play commands.</description></item>
-/// <item><description>A dedicated <see cref="CancellationTokenSource"/> invalidates recognition starts that no longer belong to the active playback session.</description></item>
+/// <item><description>Playback orchestration and dictation orchestration are handled independently so microphone lifetime is no longer tied to transport buttons.</description></item>
 /// </list>
 /// <para>
 /// In short: this class is the place where user intent, long-running tasks, and event-driven platform services are made
@@ -70,10 +69,9 @@ public sealed class MainViewModel : ObservableObject
     private SpeechEngineCapabilities _capabilities = new(false, false, false, false, false, false);
     private SpeechSynthesisResult? _preparedSynthesis;
     private string? _preparedSignature;
-    private CancellationTokenSource? _recognitionStartCts;
     private bool _isInitialized;
     private bool _isBusy;
-    private int _playRequestVersion;
+    private bool _isDictationEnabled;
     private string _sourceText = string.Empty;
     private string _recognizedText = string.Empty;
     private VoiceInfo? _selectedVoice;
@@ -85,7 +83,7 @@ public sealed class MainViewModel : ObservableObject
     private double _positionSeconds;
     private double _durationSeconds;
     private string _statusMessage = "Ready.";
-    private string _recognitionAvailabilityText = "Speech recognition is available, but not started.";
+    private string _recognitionAvailabilityText = "Dictation is off.";
     private string _shadowingSummary = "The score will appear after recognition starts.";
     private string _scoreColorHex = "#A0A7B8";
     private int? _shadowingScore;
@@ -113,7 +111,7 @@ public sealed class MainViewModel : ObservableObject
         _engines.Add(_engine.Name);
         _selectedEngineName = _engine.Name;
         _recognitionAvailabilityText = _engine.Recognition.IsAvailable
-            ? "Speech recognition is available, but not started."
+            ? "Dictation is off."
             : "Speech recognition is not available on this platform";
 
         InitializeCommand = new AsyncRelayCommand(InitializeAsync, () => !_isInitialized && !IsBusy);
@@ -122,9 +120,10 @@ public sealed class MainViewModel : ObservableObject
         StopCommand = new AsyncRelayCommand(StopAsync, () => !IsBusy && _engine.Playback.CurrentState.Status is PlaybackStatus.Playing or PlaybackStatus.Paused);
         RewindCommand = new AsyncRelayCommand(RewindAsync, () => !IsBusy && CanSeek);
         ResetCommand = new AsyncRelayCommand(ResetAsync, () => !IsBusy);
+        ToggleDictationCommand = new AsyncRelayCommand(ToggleDictationAsync, () => CanToggleDictation);
         OpenSpeechPrivacySettingsCommand = new AsyncRelayCommand(OpenSpeechPrivacySettingsAsync, () => ShowRecognitionSettingsButtons);
         OpenMicrophonePrivacySettingsCommand = new AsyncRelayCommand(OpenMicrophonePrivacySettingsAsync, () => ShowRecognitionSettingsButtons);
-        ClearRecognizedCommand = new RelayCommand(ClearRecognizedText);
+        ClearRecognizedCommand = new AsyncRelayCommand(ClearRecognizedAsync);
 
         _engine.Playback.StateChanged += OnPlaybackStateChanged;
         _engine.Recognition.StateChanged += OnRecognitionStateChanged;
@@ -149,11 +148,13 @@ public sealed class MainViewModel : ObservableObject
 
     public AsyncRelayCommand ResetCommand { get; }
 
+    public AsyncRelayCommand ToggleDictationCommand { get; }
+
     public AsyncRelayCommand OpenSpeechPrivacySettingsCommand { get; }
 
     public AsyncRelayCommand OpenMicrophonePrivacySettingsCommand { get; }
 
-    public RelayCommand ClearRecognizedCommand { get; }
+    public AsyncRelayCommand ClearRecognizedCommand { get; }
 
     public SpeechEngineCapabilities Capabilities
     {
@@ -203,14 +204,11 @@ public sealed class MainViewModel : ObservableObject
             {
                 _preparedSignature = null;
                 _preparedSynthesis = null;
-                InvalidatePlayRequest();
-                // If an older Play call was still on its way toward starting recognition, invalidate it before beginning the
-        // new Play workflow.
-        CancelPendingRecognitionStart();
                 PositionSeconds = 0;
                 DurationSeconds = 0;
                 WaveformSamples = Array.Empty<float>();
-                ClearRecognizedText();
+                ClearRecognizedTextState();
+                RequestRecognizedTranscriptClear();
                 StatusMessage = string.IsNullOrWhiteSpace(value)
                     ? "Enter text to start a shadowing session."
                     : "Text updated. Press Play to prepare fresh audio.";
@@ -344,6 +342,21 @@ public sealed class MainViewModel : ObservableObject
 
     public bool ShowRecognitionSettingsButtons => _engine.Recognition.IsAvailable;
 
+    public bool IsDictationEnabled
+    {
+        get => _isDictationEnabled;
+        private set
+        {
+            if (SetProperty(ref _isDictationEnabled, value))
+            {
+                OnPropertyChanged(nameof(DictationButtonText), nameof(CanToggleDictation));
+                RecognitionAvailabilityText = BuildRecognitionAvailabilityText(CurrentRecognitionStatus, null);
+                PersistSettings();
+                NotifyCommands();
+            }
+        }
+    }
+
     public bool IsBusy
     {
         get => _isBusy;
@@ -377,7 +390,8 @@ public sealed class MainViewModel : ObservableObject
         {
             if (SetProperty(ref _currentRecognitionStatus, value))
             {
-                OnPropertyChanged(nameof(IsRecognizing), nameof(CanEditSourceText));
+                OnPropertyChanged(nameof(IsRecognizing), nameof(CanToggleDictation));
+                NotifyCommands();
             }
         }
     }
@@ -388,11 +402,15 @@ public sealed class MainViewModel : ObservableObject
 
     public bool IsRecognizing => CurrentRecognitionStatus == RecognitionStatus.Listening || CurrentRecognitionStatus == RecognitionStatus.Starting;
 
+    public string DictationButtonText => IsDictationEnabled ? "Dictation: On" : "Dictation: Off";
+
+    public bool CanToggleDictation => _engine.Recognition.IsAvailable
+        && CurrentRecognitionStatus is not (RecognitionStatus.Starting or RecognitionStatus.Stopping);
+
     public bool CanSeek => Capabilities.SupportsSeek && DurationSeconds > 0;
 
     public bool CanEditSourceText => !IsBusy
-        && _engine.Playback.CurrentState.Status is not (PlaybackStatus.Playing or PlaybackStatus.Paused)
-        && _engine.Recognition.CurrentStatus is not (RecognitionStatus.Starting or RecognitionStatus.Listening or RecognitionStatus.Stopping);
+        && _engine.Playback.CurrentState.Status is not (PlaybackStatus.Playing or PlaybackStatus.Paused);
 
     public int? ShadowingScore
     {
@@ -447,6 +465,7 @@ public sealed class MainViewModel : ObservableObject
             SpeechRate = settings.SpeechRate is >= 0.5 and <= 2.0 ? settings.SpeechRate : 1.0;
             SpeechPitch = settings.SpeechPitch is >= 0.0 and <= 2.0 ? settings.SpeechPitch : 1.0;
             SpeechVolume = settings.SpeechVolume is >= 0.0 and <= 1.0 ? settings.SpeechVolume : 1.0;
+            IsDictationEnabled = settings.IsDictationEnabled && _engine.Recognition.IsAvailable;
 
             var voices = await _engine.VoiceCatalog.GetVoicesAsync().ConfigureAwait(false);
             await _dispatcher.RunAsync(() =>
@@ -462,15 +481,18 @@ public sealed class MainViewModel : ObservableObject
                     ?? _voices.FirstOrDefault();
             }).ConfigureAwait(false);
 
-            RecognitionAvailabilityText = _engine.Recognition.IsAvailable
-                ? "Speech recognition is available, but not started."
-                : "Speech recognition is not available on this platform";
+            RecognitionAvailabilityText = BuildRecognitionAvailabilityText(CurrentRecognitionStatus, null);
 
             StatusMessage = _voices.Count == 0
                 ? "No voices were found."
                 : "Choose a voice, enter text, and start playback.";
             _isInitialized = true;
             InitializeCommand.NotifyCanExecuteChanged();
+
+            if (IsDictationEnabled)
+            {
+                await EnsureDictationMatchesPreferenceAsync().ConfigureAwait(false);
+            }
         }
         finally
         {
@@ -492,15 +514,8 @@ public sealed class MainViewModel : ObservableObject
     /// longer valid and must be replaced.
     /// </para>
     /// <para>
-    /// Recognition is intentionally started after playback, not before. The product goal is that pressing Play should
-    /// produce audible output as quickly as possible even if microphone setup is slower or fails. Recognition therefore
-    /// behaves like a companion activity attached to playback, not a prerequisite for playback.
-    /// </para>
-    /// <para>
-    /// The method also has to defend against races. While awaits are in progress, the user may press Pause, Stop, Reset,
-    /// or edit the source text. By the time the method reaches the recognition-start phase, the original Play request may
-    /// already be obsolete. The play-request version and recognition-start cancellation token exist specifically to catch
-    /// those stale continuations and make them exit quietly.
+    /// Dictation is no longer started from Play. Playback should be free to start immediately while the microphone
+    /// follows its own dedicated toggle and persisted preference.
     /// </para>
     /// </remarks>
     public async Task PlayAsync()
@@ -516,23 +531,16 @@ public sealed class MainViewModel : ObservableObject
             await InitializeAsync().ConfigureAwait(false);
         }
 
-        // Every Play call receives its own monotonically increasing version number. Later awaits use this value to
-        // check whether the user still wants this exact session to continue.
-        var playRequestVersion = BeginPlayRequest();
         var requestSignature = BuildRequestSignature();
         var isResume = requestSignature == _preparedSignature && CurrentPlaybackStatus == PlaybackStatus.Paused;
         var requiresPreparation = requestSignature != _preparedSignature || _preparedSynthesis is null;
 
-        // If an older Play call was still on its way toward starting recognition, invalidate it before beginning the
-        // new Play workflow.
-        CancelPendingRecognitionStart();
         IsBusy = true;
         try
         {
             if (!isResume)
             {
-                ClearRecognizedText();
-                await _engine.Recognition.ResetAsync().ConfigureAwait(false);
+                await ClearRecognizedAsync().ConfigureAwait(false);
             }
 
             if (requiresPreparation)
@@ -546,51 +554,26 @@ public sealed class MainViewModel : ObservableObject
             }
 
             await _engine.Playback.PlayAsync().ConfigureAwait(false);
-            StatusMessage = _engine.Recognition.IsAvailable
-                ? "Playback is running and the microphone is connecting."
-                : "Playback is running. Speech recognition is not available on this platform.";
+            StatusMessage = _engine.Recognition.IsAvailable && IsDictationEnabled
+                ? "Playback is running. Dictation stays active independently."
+                : "Playback is running.";
             PersistSettings();
-
-            IsBusy = false;
-
-            // The awaited preparation and playback calls above may finish after the user already paused, stopped,
-            // reset, or edited the text. Recognition may start only if this Play call is still the current request and
-            // the playback service still reports an active Playing state.
-            if (!IsCurrentPlayRequest(playRequestVersion) || _engine.Playback.CurrentState.Status != PlaybackStatus.Playing)
-            {
-                return;
-            }
-
-            var recognitionStartToken = CreateRecognitionStartToken();
-            await StartRecognitionIfAvailableAsync(recognitionStartToken).ConfigureAwait(false);
         }
         finally
         {
-            if (IsBusy)
-            {
-                IsBusy = false;
-            }
+            IsBusy = false;
         }
     }
 
     /// <summary>
-    /// Pauses playback and stops recognition for the active session.
+    /// Pauses playback without affecting the independent dictation toggle.
     /// </summary>
-    /// <remarks>
-    /// Pause first invalidates the current Play request so that any older asynchronous continuation can no longer attach
-    /// a recognizer to this session after the user already paused it.
-    /// </remarks>
     public async Task PauseAsync()
     {
-        InvalidatePlayRequest();
-        // If an older Play call was still on its way toward starting recognition, invalidate it before beginning the
-        // new Play workflow.
-        CancelPendingRecognitionStart();
         IsBusy = true;
         try
         {
             await _engine.Playback.PauseAsync().ConfigureAwait(false);
-            await StopRecognitionIfRunningAsync().ConfigureAwait(false);
             StatusMessage = "Playback is paused.";
         }
         finally
@@ -600,23 +583,14 @@ public sealed class MainViewModel : ObservableObject
     }
 
     /// <summary>
-    /// Stops playback, rewinds to the beginning, and stops recognition.
+    /// Stops playback and rewinds to the beginning without changing dictation state.
     /// </summary>
-    /// <remarks>
-    /// Like <see cref="PauseAsync"/>, this method invalidates the current Play request before awaiting anything. That is
-    /// what prevents a previously started async flow from reviving recognition after the session was already stopped.
-    /// </remarks>
     public async Task StopAsync()
     {
-        InvalidatePlayRequest();
-        // If an older Play call was still on its way toward starting recognition, invalidate it before beginning the
-        // new Play workflow.
-        CancelPendingRecognitionStart();
         IsBusy = true;
         try
         {
             await _engine.Playback.StopAsync().ConfigureAwait(false);
-            await StopRecognitionIfRunningAsync().ConfigureAwait(false);
             StatusMessage = "Playback stopped.";
         }
         finally
@@ -648,7 +622,7 @@ public sealed class MainViewModel : ObservableObject
     }
 
     /// <summary>
-    /// Clears playback, recognition state, prepared synthesis, and editable text.
+    /// Clears playback, transcript state, prepared synthesis, and editable text.
     /// </summary>
     /// <remarks>
     /// Reset is stronger than Stop. It not only ends the current session but also discards cached synthesis artifacts and
@@ -656,20 +630,20 @@ public sealed class MainViewModel : ObservableObject
     /// </remarks>
     public async Task ResetAsync()
     {
-        InvalidatePlayRequest();
-        // If an older Play call was still on its way toward starting recognition, invalidate it before beginning the
-        // new Play workflow.
-        CancelPendingRecognitionStart();
         IsBusy = true;
         try
         {
             await _engine.Playback.ResetAsync().ConfigureAwait(false);
-            await _engine.Recognition.ResetAsync().ConfigureAwait(false);
+            await ClearRecognizedAsync().ConfigureAwait(false);
             _preparedSynthesis = null;
             _preparedSignature = null;
             SourceText = string.Empty;
-            ClearRecognizedText();
             StatusMessage = "Everything was reset.";
+
+            if (IsDictationEnabled)
+            {
+                await EnsureDictationMatchesPreferenceAsync().ConfigureAwait(false);
+            }
         }
         finally
         {
@@ -705,27 +679,54 @@ public sealed class MainViewModel : ObservableObject
             : "Audio prepared.";
     }
 
-    /// <summary>
-    /// Starts recognition only when the platform supports it.
-    /// </summary>
-    /// <remarks>
-    /// The cancellation token does not represent microphone capture itself. It represents the caller's interest in this
-    /// specific start attempt. If the token is cancelled, it means a newer user action already replaced this request.
-    /// </remarks>
-    private async Task StartRecognitionIfAvailableAsync(CancellationToken cancellationToken)
+    private async Task ToggleDictationAsync()
     {
         if (!_engine.Recognition.IsAvailable)
         {
             return;
         }
 
-        await _engine.Recognition.StartAsync(cancellationToken).ConfigureAwait(false);
+        if (IsDictationEnabled)
+        {
+            IsDictationEnabled = false;
+            await StopDictationIfRunningAsync().ConfigureAwait(false);
+            StatusMessage = "Dictation turned off.";
+            return;
+        }
+
+        IsDictationEnabled = true;
+        await EnsureDictationMatchesPreferenceAsync().ConfigureAwait(false);
+        StatusMessage = CurrentRecognitionStatus == RecognitionStatus.Listening
+            ? "Dictation is on."
+            : "Dictation is enabled and the microphone is starting.";
     }
 
-    /// <summary>
-    /// Stops recognition based on the recognizer's actual service state rather than the lagging view-model snapshot.
-    /// </summary>
-    private async Task StopRecognitionIfRunningAsync()
+    private async Task ClearRecognizedAsync()
+    {
+        ClearRecognizedTextState();
+
+        if (_engine.Recognition.IsAvailable)
+        {
+            await _engine.Recognition.ClearTranscriptAsync().ConfigureAwait(false);
+        }
+    }
+
+    private async Task EnsureDictationMatchesPreferenceAsync()
+    {
+        if (!_engine.Recognition.IsAvailable || !IsDictationEnabled)
+        {
+            return;
+        }
+
+        if (_engine.Recognition.CurrentStatus is RecognitionStatus.Listening or RecognitionStatus.Starting)
+        {
+            return;
+        }
+
+        await _engine.Recognition.StartAsync().ConfigureAwait(false);
+    }
+
+    private async Task StopDictationIfRunningAsync()
     {
         if (!_engine.Recognition.IsAvailable)
         {
@@ -738,6 +739,16 @@ public sealed class MainViewModel : ObservableObject
         }
     }
 
+    private void RequestRecognizedTranscriptClear()
+    {
+        if (!_engine.Recognition.IsAvailable)
+        {
+            return;
+        }
+
+        _ = _engine.Recognition.ClearTranscriptAsync();
+    }
+
     private async Task OpenSpeechPrivacySettingsAsync()
     {
         await _settingsLauncher.OpenAsync("ms-settings:privacy-speech").ConfigureAwait(false);
@@ -748,43 +759,7 @@ public sealed class MainViewModel : ObservableObject
         await _settingsLauncher.OpenAsync("ms-settings:privacy-microphone").ConfigureAwait(false);
     }
 
-    private int BeginPlayRequest()
-    {
-        return Interlocked.Increment(ref _playRequestVersion);
-    }
-
-    private void InvalidatePlayRequest()
-    {
-        Interlocked.Increment(ref _playRequestVersion);
-    }
-
-    private bool IsCurrentPlayRequest(int playRequestVersion)
-    {
-        return Volatile.Read(ref _playRequestVersion) == playRequestVersion;
-    }
-
-    private CancellationToken CreateRecognitionStartToken()
-    {
-        // If an older Play call was still on its way toward starting recognition, invalidate it before beginning the
-        // new Play workflow.
-        CancelPendingRecognitionStart();
-        _recognitionStartCts = new CancellationTokenSource();
-        return _recognitionStartCts.Token;
-    }
-
-    private void CancelPendingRecognitionStart()
-    {
-        if (_recognitionStartCts is null)
-        {
-            return;
-        }
-
-        _recognitionStartCts.Cancel();
-        _recognitionStartCts.Dispose();
-        _recognitionStartCts = null;
-    }
-
-    private void ClearRecognizedText()
+    private void ClearRecognizedTextState()
     {
         RecognizedText = string.Empty;
         ShadowingScore = null;
@@ -837,6 +812,7 @@ public sealed class MainViewModel : ObservableObject
             SpeechRate,
             SpeechPitch,
             SpeechVolume,
+            IsDictationEnabled,
             MapThemeOption(SelectedThemeOption)));
     }
 
@@ -848,6 +824,7 @@ public sealed class MainViewModel : ObservableObject
         StopCommand.NotifyCanExecuteChanged();
         RewindCommand.NotifyCanExecuteChanged();
         ResetCommand.NotifyCanExecuteChanged();
+        ToggleDictationCommand.NotifyCanExecuteChanged();
         OpenSpeechPrivacySettingsCommand.NotifyCanExecuteChanged();
         OpenMicrophonePrivacySettingsCommand.NotifyCanExecuteChanged();
         ClearRecognizedCommand.NotifyCanExecuteChanged();
@@ -934,7 +911,7 @@ public sealed class MainViewModel : ObservableObject
             RecognitionStatus.Error => string.IsNullOrWhiteSpace(message)
                 ? "Speech recognition is unavailable."
                 : message,
-            _ => "Speech recognition is available, but not started."
+            _ => IsDictationEnabled ? "Dictation is enabled, but the microphone is idle." : "Dictation is off."
         };
     }
 
@@ -968,11 +945,4 @@ public sealed class MainViewModel : ObservableObject
         };
     }
 }
-
-
-
-
-
-
-
 

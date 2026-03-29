@@ -8,4 +8,7 @@ public sealed record ShadowingSettings(
     double SpeechRate,
     double SpeechPitch,
     double SpeechVolume,
+    bool IsDictationEnabled,
     ThemePreferenceMode ThemePreference);
+
+
