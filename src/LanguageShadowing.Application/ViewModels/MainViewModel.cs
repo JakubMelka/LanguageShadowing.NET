@@ -115,12 +115,12 @@ public sealed class MainViewModel : ObservableObject
             : "Speech recognition is not available on this platform";
 
         InitializeCommand = new AsyncRelayCommand(InitializeAsync, () => !_isInitialized && !IsBusy);
-        PlayCommand = new AsyncRelayCommand(PlayAsync, () => !IsBusy && CurrentPlaybackStatus != PlaybackStatus.Playing);
-        PauseCommand = new AsyncRelayCommand(PauseAsync, () => !IsBusy && CurrentPlaybackStatus == PlaybackStatus.Playing && Capabilities.SupportsPause);
-        StopCommand = new AsyncRelayCommand(StopAsync, () => !IsBusy && CurrentPlaybackStatus is PlaybackStatus.Playing or PlaybackStatus.Paused);
-        RewindCommand = new AsyncRelayCommand(RewindAsync, () => !IsBusy && CanSeek);
-        ResetCommand = new AsyncRelayCommand(ResetAsync, () => !IsBusy);
-        ToggleDictationCommand = new AsyncRelayCommand(ToggleDictationAsync, () => CanToggleDictation);
+        PlayCommand = new AsyncRelayCommand(PlayAsync);
+        PauseCommand = new AsyncRelayCommand(PauseAsync);
+        StopCommand = new AsyncRelayCommand(StopAsync);
+        RewindCommand = new AsyncRelayCommand(RewindAsync);
+        ResetCommand = new AsyncRelayCommand(ResetAsync);
+        ToggleDictationCommand = new AsyncRelayCommand(ToggleDictationAsync);
         OpenSpeechPrivacySettingsCommand = new AsyncRelayCommand(OpenSpeechPrivacySettingsAsync, () => ShowRecognitionSettingsButtons);
         OpenMicrophonePrivacySettingsCommand = new AsyncRelayCommand(OpenMicrophonePrivacySettingsAsync, () => ShowRecognitionSettingsButtons);
         ClearRecognizedCommand = new AsyncRelayCommand(ClearRecognizedAsync);
@@ -830,6 +830,24 @@ public sealed class MainViewModel : ObservableObject
         ClearRecognizedCommand.NotifyCanExecuteChanged();
     }
 
+    private Task ApplyPlaybackSnapshotAsync(PlaybackState state)
+    {
+        return _dispatcher.RunAsync(() => ApplyPlaybackSnapshot(state));
+    }
+
+    private void ApplyPlaybackSnapshot(PlaybackState state)
+    {
+        CurrentPlaybackStatus = state.Status;
+        PositionSeconds = state.Position.TotalSeconds;
+        DurationSeconds = Math.Max(DurationSeconds, state.Duration.TotalSeconds);
+
+        if (!string.IsNullOrWhiteSpace(state.Message)
+            && state.Status is PlaybackStatus.Ready or PlaybackStatus.Completed or PlaybackStatus.Error)
+        {
+            StatusMessage = state.Message;
+        }
+    }
+
     /// <summary>
     /// Applies playback snapshots on the UI thread.
     /// </summary>
@@ -840,18 +858,7 @@ public sealed class MainViewModel : ObservableObject
     /// </remarks>
     private void OnPlaybackStateChanged(object? sender, PlaybackStateChangedEventArgs e)
     {
-        _ = _dispatcher.RunAsync(() =>
-        {
-            CurrentPlaybackStatus = e.State.Status;
-            PositionSeconds = e.State.Position.TotalSeconds;
-            DurationSeconds = Math.Max(DurationSeconds, e.State.Duration.TotalSeconds);
-
-            if (!string.IsNullOrWhiteSpace(e.State.Message)
-                && e.State.Status is PlaybackStatus.Ready or PlaybackStatus.Completed or PlaybackStatus.Error)
-            {
-                StatusMessage = e.State.Message;
-            }
-        });
+        _ = ApplyPlaybackSnapshotAsync(e.State);
     }
 
     /// <summary>
@@ -945,6 +952,8 @@ public sealed class MainViewModel : ObservableObject
         };
     }
 }
+
+
 
 
 
