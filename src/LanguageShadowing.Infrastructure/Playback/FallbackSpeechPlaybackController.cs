@@ -5,48 +5,28 @@ using Microsoft.Maui.Media;
 
 namespace LanguageShadowing.Infrastructure.Playback;
 
-/// <summary>
-/// Estimated playback controller used when the platform cannot provide a real audio stream for the synthesized text.
-/// </summary>
-/// <remarks>
-/// <para>
-/// This controller does not play pre-generated audio bytes. Instead it walks through the already planned speech segments
-/// and asks MAUI's <see cref="TextToSpeech"/> API to speak each segment one after another.
-/// </para>
-/// <para>
-/// Because MAUI TTS does not expose a true playback clock, the controller can only estimate progress. It therefore
-/// publishes the start and end of each segment as coarse playback positions. That is sufficient for this application,
-/// whose UI only needs to show approximate forward movement rather than sample-accurate timing.
-/// </para>
-/// <para>
-/// The asynchronous playback loop runs in the background after <see cref="PlayAsync"/> returns. That design keeps the UI
-/// responsive and lets transport commands like Pause, Stop, and Seek cancel the old loop and start a new one if needed.
-/// </para>
-/// </remarks>
 public sealed class FallbackSpeechPlaybackController : IAudioPlaybackController
 {
     private readonly SemaphoreSlim _gate = new(1, 1);
     private CancellationTokenSource? _playbackCts;
     private SpeechSynthesisResult? _loaded;
     private int _currentSegmentIndex;
+    private int _playbackVersion;
     private PlaybackState _state = PlaybackState.Idle;
 
-    /// <inheritdoc />
     public PlaybackState CurrentState => _state;
 
-    /// <inheritdoc />
     public event EventHandler<PlaybackStateChangedEventArgs>? StateChanged;
 
-    /// <inheritdoc />
     public Task LoadAsync(SpeechSynthesisResult synthesisResult, CancellationToken cancellationToken = default)
     {
         _loaded = synthesisResult;
         _currentSegmentIndex = 0;
+        Interlocked.Increment(ref _playbackVersion);
         Publish(new PlaybackState(PlaybackStatus.Ready, TimeSpan.Zero, synthesisResult.Duration, synthesisResult.Segments.Count > 0, false));
         return Task.CompletedTask;
     }
 
-    /// <inheritdoc />
     public async Task PlayAsync(CancellationToken cancellationToken = default)
     {
         await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
@@ -65,8 +45,9 @@ public sealed class FallbackSpeechPlaybackController : IAudioPlaybackController
 
             _playbackCts?.Cancel();
             _playbackCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            var playbackVersion = Interlocked.Increment(ref _playbackVersion);
             Publish(_state with { Status = PlaybackStatus.Playing, IsBusy = true, Message = "Playing in estimated fallback mode." });
-            _ = RunPlaybackAsync(_loaded, _playbackCts.Token);
+            _ = RunPlaybackAsync(_loaded, playbackVersion, _playbackCts.Token);
         }
         finally
         {
@@ -74,34 +55,33 @@ public sealed class FallbackSpeechPlaybackController : IAudioPlaybackController
         }
     }
 
-    /// <inheritdoc />
     public Task PauseAsync(CancellationToken cancellationToken = default)
     {
         _playbackCts?.Cancel();
+        Interlocked.Increment(ref _playbackVersion);
         Publish(_state with { Status = PlaybackStatus.Paused, IsBusy = false, Message = "Pause returns to the start of the current sentence in fallback mode." });
         return Task.CompletedTask;
     }
 
-    /// <inheritdoc />
     public Task StopAsync(CancellationToken cancellationToken = default)
     {
         _playbackCts?.Cancel();
+        Interlocked.Increment(ref _playbackVersion);
         _currentSegmentIndex = 0;
         Publish(_state with { Status = PlaybackStatus.Stopped, Position = TimeSpan.Zero, IsBusy = false, Message = "Playback stopped." });
         return Task.CompletedTask;
     }
 
-    /// <inheritdoc />
     public Task ResetAsync(CancellationToken cancellationToken = default)
     {
         _playbackCts?.Cancel();
+        Interlocked.Increment(ref _playbackVersion);
         _currentSegmentIndex = 0;
         _loaded = null;
         Publish(PlaybackState.Idle);
         return Task.CompletedTask;
     }
 
-    /// <inheritdoc />
     public async Task SeekAsync(TimeSpan position, CancellationToken cancellationToken = default)
     {
         if (_loaded is null)
@@ -111,6 +91,7 @@ public sealed class FallbackSpeechPlaybackController : IAudioPlaybackController
 
         var wasPlaying = _state.Status == PlaybackStatus.Playing;
         _playbackCts?.Cancel();
+        Interlocked.Increment(ref _playbackVersion);
         _currentSegmentIndex = Math.Max(0, _loaded.Segments
             .Select((segment, index) => new { segment, index })
             .LastOrDefault(entry => entry.segment.Start <= position)?.index ?? 0);
@@ -124,7 +105,6 @@ public sealed class FallbackSpeechPlaybackController : IAudioPlaybackController
         }
     }
 
-    /// <inheritdoc />
     public ValueTask DisposeAsync()
     {
         _playbackCts?.Cancel();
@@ -133,30 +113,33 @@ public sealed class FallbackSpeechPlaybackController : IAudioPlaybackController
         return ValueTask.CompletedTask;
     }
 
-    /// <summary>
-    /// Runs the background segment-by-segment playback loop.
-    /// </summary>
-    /// <remarks>
-    /// This is intentionally not awaited by <see cref="PlayAsync"/>. The caller only needs playback to start, not to
-    /// wait until every segment has finished. Cancellation stops the current loop and lets another transport command
-    /// replace it with a newer loop.
-    /// </remarks>
-    private async Task RunPlaybackAsync(SpeechSynthesisResult result, CancellationToken cancellationToken)
+    private async Task RunPlaybackAsync(SpeechSynthesisResult result, int playbackVersion, CancellationToken cancellationToken)
     {
         try
         {
             var options = await CreateSpeechOptionsAsync(result.Request.Voice?.Locale).ConfigureAwait(false);
             for (; _currentSegmentIndex < result.Segments.Count; _currentSegmentIndex++)
             {
-                var segment = result.Segments[_currentSegmentIndex];
+                if (playbackVersion != Volatile.Read(ref _playbackVersion))
+                {
+                    return;
+                }
 
-                // Publish the segment start before speech begins so the UI can move immediately.
+                var segment = result.Segments[_currentSegmentIndex];
                 Publish(_state with { Status = PlaybackStatus.Playing, Position = segment.Start, Duration = result.Duration, IsBusy = true });
                 await TextToSpeech.Default.SpeakAsync(segment.Text, options, cancellationToken).ConfigureAwait(false);
 
-                // Publish the estimated segment end after speech finishes. This is not exact audio timing, but it gives
-                // the user a stable feeling of progress through the utterance.
+                if (playbackVersion != Volatile.Read(ref _playbackVersion))
+                {
+                    return;
+                }
+
                 Publish(_state with { Status = PlaybackStatus.Playing, Position = segment.Start + segment.Duration, Duration = result.Duration, IsBusy = true });
+            }
+
+            if (playbackVersion != Volatile.Read(ref _playbackVersion))
+            {
+                return;
             }
 
             Publish(_state with { Status = PlaybackStatus.Completed, Position = result.Duration, Duration = result.Duration, IsBusy = false, Message = "Playback completed." });
@@ -167,13 +150,15 @@ public sealed class FallbackSpeechPlaybackController : IAudioPlaybackController
         }
         catch (Exception ex)
         {
+            if (playbackVersion != Volatile.Read(ref _playbackVersion))
+            {
+                return;
+            }
+
             Publish(_state with { Status = PlaybackStatus.Error, IsBusy = false, Message = ex.Message });
         }
     }
 
-    /// <summary>
-    /// Resolves a MAUI speech locale from the requested voice locale when possible.
-    /// </summary>
     private static async Task<SpeechOptions> CreateSpeechOptionsAsync(string? localeCode)
     {
         var options = new SpeechOptions

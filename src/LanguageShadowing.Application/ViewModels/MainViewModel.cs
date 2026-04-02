@@ -63,6 +63,9 @@ public sealed class MainViewModel : ObservableObject
     private readonly IAppDispatcher _dispatcher;
     private readonly IAppThemeService _themeService;
     private readonly ISettingsLauncher _settingsLauncher;
+    private readonly SemaphoreSlim _initializationGate = new(1, 1);
+    private readonly SemaphoreSlim _transportGate = new(1, 1);
+    private readonly SemaphoreSlim _recognitionGate = new(1, 1);
     private readonly ObservableCollection<VoiceInfo> _voices = new();
     private readonly ObservableCollection<string> _engines = new();
     private IReadOnlyList<float> _waveformSamples = Array.Empty<float>();
@@ -89,6 +92,7 @@ public sealed class MainViewModel : ObservableObject
     private int? _shadowingScore;
     private PlaybackStatus _currentPlaybackStatus = PlaybackStatus.Idle;
     private RecognitionStatus _currentRecognitionStatus = RecognitionStatus.Idle;
+    private int _recognitionRefreshVersion;
 
     public MainViewModel(
         ISpeechEngine engine,
@@ -208,7 +212,7 @@ public sealed class MainViewModel : ObservableObject
                 DurationSeconds = 0;
                 WaveformSamples = Array.Empty<float>();
                 ClearRecognizedTextState();
-                RequestRecognizedTranscriptClear();
+                RequestRecognitionRefresh();
                 StatusMessage = string.IsNullOrWhiteSpace(value)
                     ? "Enter text to start a shadowing session."
                     : "Text updated. Press Play to prepare fresh audio.";
@@ -453,50 +457,63 @@ public sealed class MainViewModel : ObservableObject
             return;
         }
 
-        IsBusy = true;
-        StatusMessage = "Loading voices and engine capabilities...";
-
+        await _initializationGate.WaitAsync().ConfigureAwait(false);
         try
         {
-            Capabilities = _engine.Capabilities;
-            SelectedEngineName = _engine.Name;
-            var settings = await _settingsStore.LoadAsync().ConfigureAwait(false);
-            SelectedThemeOption = MapThemePreferenceToOption(settings.ThemePreference);
-            SpeechRate = settings.SpeechRate is >= 0.5 and <= 2.0 ? settings.SpeechRate : 1.0;
-            SpeechPitch = settings.SpeechPitch is >= 0.0 and <= 2.0 ? settings.SpeechPitch : 1.0;
-            SpeechVolume = settings.SpeechVolume is >= 0.0 and <= 1.0 ? settings.SpeechVolume : 1.0;
-            IsDictationEnabled = settings.IsDictationEnabled && _engine.Recognition.IsAvailable;
-
-            var voices = await _engine.VoiceCatalog.GetVoicesAsync().ConfigureAwait(false);
-            await _dispatcher.RunAsync(() =>
+            if (_isInitialized)
             {
-                _voices.Clear();
-                foreach (var voice in voices.OrderBy(v => v.DisplayName))
+                return;
+            }
+
+            IsBusy = true;
+            StatusMessage = "Loading voices and engine capabilities...";
+
+            try
+            {
+                Capabilities = _engine.Capabilities;
+                SelectedEngineName = _engine.Name;
+                var settings = await _settingsStore.LoadAsync().ConfigureAwait(false);
+                SelectedThemeOption = MapThemePreferenceToOption(settings.ThemePreference);
+                SpeechRate = settings.SpeechRate is >= 0.5 and <= 2.0 ? settings.SpeechRate : 1.0;
+                SpeechPitch = settings.SpeechPitch is >= 0.0 and <= 2.0 ? settings.SpeechPitch : 1.0;
+                SpeechVolume = settings.SpeechVolume is >= 0.0 and <= 1.0 ? settings.SpeechVolume : 1.0;
+                IsDictationEnabled = settings.IsDictationEnabled && _engine.Recognition.IsAvailable;
+
+                var voices = await _engine.VoiceCatalog.GetVoicesAsync().ConfigureAwait(false);
+                await _dispatcher.RunAsync(() =>
                 {
-                    _voices.Add(voice);
+                    _voices.Clear();
+                    foreach (var voice in voices.OrderBy(v => v.DisplayName))
+                    {
+                        _voices.Add(voice);
+                    }
+
+                    SelectedVoice = _voices.FirstOrDefault(v => v.Id == settings.PreferredVoiceId)
+                        ?? _voices.FirstOrDefault(v => v.IsDefault)
+                        ?? _voices.FirstOrDefault();
+                }).ConfigureAwait(false);
+
+                RecognitionAvailabilityText = BuildRecognitionAvailabilityText(CurrentRecognitionStatus, null);
+
+                StatusMessage = _voices.Count == 0
+                    ? "No voices were found."
+                    : "Choose a voice, enter text, and start playback.";
+                _isInitialized = true;
+                InitializeCommand.NotifyCanExecuteChanged();
+
+                if (IsDictationEnabled)
+                {
+                    await EnsureDictationMatchesPreferenceAsync().ConfigureAwait(false);
                 }
-
-                SelectedVoice = _voices.FirstOrDefault(v => v.Id == settings.PreferredVoiceId)
-                    ?? _voices.FirstOrDefault(v => v.IsDefault)
-                    ?? _voices.FirstOrDefault();
-            }).ConfigureAwait(false);
-
-            RecognitionAvailabilityText = BuildRecognitionAvailabilityText(CurrentRecognitionStatus, null);
-
-            StatusMessage = _voices.Count == 0
-                ? "No voices were found."
-                : "Choose a voice, enter text, and start playback.";
-            _isInitialized = true;
-            InitializeCommand.NotifyCanExecuteChanged();
-
-            if (IsDictationEnabled)
+            }
+            finally
             {
-                await EnsureDictationMatchesPreferenceAsync().ConfigureAwait(false);
+                IsBusy = false;
             }
         }
         finally
         {
-            IsBusy = false;
+            _initializationGate.Release();
         }
     }
 
@@ -520,48 +537,63 @@ public sealed class MainViewModel : ObservableObject
     /// </remarks>
     public async Task PlayAsync()
     {
-        if (string.IsNullOrWhiteSpace(SourceText))
-        {
-            StatusMessage = "Enter the source text first.";
-            return;
-        }
-
-        if (!_isInitialized)
-        {
-            await InitializeAsync().ConfigureAwait(false);
-        }
-
-        var requestSignature = BuildRequestSignature();
-        var isResume = requestSignature == _preparedSignature && CurrentPlaybackStatus == PlaybackStatus.Paused;
-        var requiresPreparation = requestSignature != _preparedSignature || _preparedSynthesis is null;
-
-        IsBusy = true;
+        await _transportGate.WaitAsync().ConfigureAwait(false);
         try
         {
-            if (!isResume)
+            if (string.IsNullOrWhiteSpace(SourceText))
             {
-                await ClearRecognizedAsync().ConfigureAwait(false);
+                StatusMessage = "Enter the source text first.";
+                return;
             }
 
-            if (requiresPreparation)
+            if (!_isInitialized)
             {
-                StatusMessage = "Generating speech output...";
-                var request = new SpeechSynthesisRequest(SourceText.Trim(), SelectedVoice, SpeechRate, SpeechPitch, SpeechVolume);
-                _preparedSynthesis = await _engine.TextToSpeech.PrepareAsync(request).ConfigureAwait(false);
-                _preparedSignature = requestSignature;
-                await _engine.Playback.LoadAsync(_preparedSynthesis).ConfigureAwait(false);
-                ApplySynthesisResult(_preparedSynthesis);
+                await InitializeAsync().ConfigureAwait(false);
             }
 
-            await _engine.Playback.PlayAsync().ConfigureAwait(false);
-            StatusMessage = _engine.Recognition.IsAvailable && IsDictationEnabled
-                ? "Playback is running. Dictation stays active independently."
-                : "Playback is running.";
-            PersistSettings();
+            if (CurrentPlaybackStatus == PlaybackStatus.Playing)
+            {
+                return;
+            }
+
+            var requestSignature = BuildRequestSignature();
+            var isResume = requestSignature == _preparedSignature && CurrentPlaybackStatus == PlaybackStatus.Paused;
+            var requiresPreparation = requestSignature != _preparedSignature || _preparedSynthesis is null;
+
+            IsBusy = true;
+            try
+            {
+                if (!isResume)
+                {
+                    await ClearRecognizedAsync().ConfigureAwait(false);
+                }
+
+                if (requiresPreparation)
+                {
+                    StatusMessage = "Generating speech output...";
+                    var request = new SpeechSynthesisRequest(SourceText.Trim(), SelectedVoice, SpeechRate, SpeechPitch, SpeechVolume);
+                    _preparedSynthesis = await _engine.TextToSpeech.PrepareAsync(request).ConfigureAwait(false);
+                    _preparedSignature = requestSignature;
+                    await _engine.Playback.LoadAsync(_preparedSynthesis).ConfigureAwait(false);
+                    await ApplyPlaybackSnapshotAsync(_engine.Playback.CurrentState).ConfigureAwait(false);
+                    ApplySynthesisResult(_preparedSynthesis);
+                }
+
+                await _engine.Playback.PlayAsync().ConfigureAwait(false);
+                await ApplyPlaybackSnapshotAsync(_engine.Playback.CurrentState).ConfigureAwait(false);
+                StatusMessage = _engine.Recognition.IsAvailable && IsDictationEnabled
+                    ? "Playback is running. Dictation stays active independently."
+                    : "Playback is running.";
+                PersistSettings();
+            }
+            finally
+            {
+                IsBusy = false;
+            }
         }
         finally
         {
-            IsBusy = false;
+            _transportGate.Release();
         }
     }
 
@@ -570,15 +602,29 @@ public sealed class MainViewModel : ObservableObject
     /// </summary>
     public async Task PauseAsync()
     {
-        IsBusy = true;
+        await _transportGate.WaitAsync().ConfigureAwait(false);
         try
         {
-            await _engine.Playback.PauseAsync().ConfigureAwait(false);
-            StatusMessage = "Playback is paused.";
+            if (CurrentPlaybackStatus != PlaybackStatus.Playing || !Capabilities.SupportsPause)
+            {
+                return;
+            }
+
+            IsBusy = true;
+            try
+            {
+                await _engine.Playback.PauseAsync().ConfigureAwait(false);
+                await ApplyPlaybackSnapshotAsync(_engine.Playback.CurrentState).ConfigureAwait(false);
+                StatusMessage = "Playback is paused.";
+            }
+            finally
+            {
+                IsBusy = false;
+            }
         }
         finally
         {
-            IsBusy = false;
+            _transportGate.Release();
         }
     }
 
@@ -587,15 +633,29 @@ public sealed class MainViewModel : ObservableObject
     /// </summary>
     public async Task StopAsync()
     {
-        IsBusy = true;
+        await _transportGate.WaitAsync().ConfigureAwait(false);
         try
         {
-            await _engine.Playback.StopAsync().ConfigureAwait(false);
-            StatusMessage = "Playback stopped.";
+            if (CurrentPlaybackStatus is not (PlaybackStatus.Playing or PlaybackStatus.Paused))
+            {
+                return;
+            }
+
+            IsBusy = true;
+            try
+            {
+                await _engine.Playback.StopAsync().ConfigureAwait(false);
+                await ApplyPlaybackSnapshotAsync(_engine.Playback.CurrentState).ConfigureAwait(false);
+                StatusMessage = "Playback stopped.";
+            }
+            finally
+            {
+                IsBusy = false;
+            }
         }
         finally
         {
-            IsBusy = false;
+            _transportGate.Release();
         }
     }
 
@@ -604,20 +664,29 @@ public sealed class MainViewModel : ObservableObject
     /// </summary>
     public async Task RewindAsync()
     {
-        if (!CanSeek)
-        {
-            return;
-        }
-
-        IsBusy = true;
+        await _transportGate.WaitAsync().ConfigureAwait(false);
         try
         {
-            await _engine.Playback.SeekAsync(TimeSpan.Zero).ConfigureAwait(false);
-            StatusMessage = "Position reset to the beginning.";
+            if (!CanSeek)
+            {
+                return;
+            }
+
+            IsBusy = true;
+            try
+            {
+                await _engine.Playback.SeekAsync(TimeSpan.Zero).ConfigureAwait(false);
+                await ApplyPlaybackSnapshotAsync(_engine.Playback.CurrentState).ConfigureAwait(false);
+                StatusMessage = "Position reset to the beginning.";
+            }
+            finally
+            {
+                IsBusy = false;
+            }
         }
         finally
         {
-            IsBusy = false;
+            _transportGate.Release();
         }
     }
 
@@ -630,24 +699,27 @@ public sealed class MainViewModel : ObservableObject
     /// </remarks>
     public async Task ResetAsync()
     {
-        IsBusy = true;
+        await _transportGate.WaitAsync().ConfigureAwait(false);
         try
         {
-            await _engine.Playback.ResetAsync().ConfigureAwait(false);
-            await ClearRecognizedAsync().ConfigureAwait(false);
-            _preparedSynthesis = null;
-            _preparedSignature = null;
-            SourceText = string.Empty;
-            StatusMessage = "Everything was reset.";
-
-            if (IsDictationEnabled)
+            IsBusy = true;
+            try
             {
-                await EnsureDictationMatchesPreferenceAsync().ConfigureAwait(false);
+                await _engine.Playback.ResetAsync().ConfigureAwait(false);
+                await ApplyPlaybackSnapshotAsync(_engine.Playback.CurrentState).ConfigureAwait(false);
+                _preparedSynthesis = null;
+                _preparedSignature = null;
+                SourceText = string.Empty;
+                StatusMessage = "Everything was reset.";
+            }
+            finally
+            {
+                IsBusy = false;
             }
         }
         finally
         {
-            IsBusy = false;
+            _transportGate.Release();
         }
     }
 
@@ -660,13 +732,22 @@ public sealed class MainViewModel : ObservableObject
     /// </remarks>
     public async Task SeekAsync(double positionSeconds)
     {
-        if (!CanSeek)
+        await _transportGate.WaitAsync().ConfigureAwait(false);
+        try
         {
-            return;
-        }
+            if (!CanSeek)
+            {
+                return;
+            }
 
-        var target = TimeSpan.FromSeconds(Math.Clamp(positionSeconds, 0, DurationSeconds));
-        await _engine.Playback.SeekAsync(target).ConfigureAwait(false);
+            var target = TimeSpan.FromSeconds(Math.Clamp(positionSeconds, 0, DurationSeconds));
+            await _engine.Playback.SeekAsync(target).ConfigureAwait(false);
+            await ApplyPlaybackSnapshotAsync(_engine.Playback.CurrentState).ConfigureAwait(false);
+        }
+        finally
+        {
+            _transportGate.Release();
+        }
     }
 
     private void ApplySynthesisResult(SpeechSynthesisResult synthesisResult)
@@ -686,29 +767,42 @@ public sealed class MainViewModel : ObservableObject
             return;
         }
 
-        if (IsDictationEnabled)
+        await _recognitionGate.WaitAsync().ConfigureAwait(false);
+        try
         {
-            IsDictationEnabled = false;
-            await StopDictationIfRunningAsync().ConfigureAwait(false);
-            StatusMessage = "Dictation turned off.";
-            return;
-        }
+            if (IsDictationEnabled)
+            {
+                IsDictationEnabled = false;
+                Interlocked.Increment(ref _recognitionRefreshVersion);
+                await StopDictationIfRunningAsync().ConfigureAwait(false);
+                StatusMessage = "Dictation turned off.";
+                return;
+            }
 
-        IsDictationEnabled = true;
-        await EnsureDictationMatchesPreferenceAsync().ConfigureAwait(false);
-        StatusMessage = CurrentRecognitionStatus == RecognitionStatus.Listening
-            ? "Dictation is on."
-            : "Dictation is enabled and the microphone is starting.";
+            IsDictationEnabled = true;
+            Interlocked.Increment(ref _recognitionRefreshVersion);
+            await EnsureDictationMatchesPreferenceAsync().ConfigureAwait(false);
+            StatusMessage = CurrentRecognitionStatus == RecognitionStatus.Listening
+                ? "Dictation is on."
+                : "Dictation is enabled and the microphone is starting.";
+        }
+        finally
+        {
+            _recognitionGate.Release();
+        }
     }
 
     private async Task ClearRecognizedAsync()
     {
         ClearRecognizedTextState();
 
-        if (_engine.Recognition.IsAvailable)
+        if (!_engine.Recognition.IsAvailable)
         {
-            await _engine.Recognition.ClearTranscriptAsync().ConfigureAwait(false);
+            return;
         }
+
+        var refreshVersion = Interlocked.Increment(ref _recognitionRefreshVersion);
+        await RefreshRecognitionAsync(refreshVersion).ConfigureAwait(false);
     }
 
     private async Task EnsureDictationMatchesPreferenceAsync()
@@ -739,14 +833,40 @@ public sealed class MainViewModel : ObservableObject
         }
     }
 
-    private void RequestRecognizedTranscriptClear()
+    private void RequestRecognitionRefresh()
     {
         if (!_engine.Recognition.IsAvailable)
         {
             return;
         }
 
-        _ = _engine.Recognition.ClearTranscriptAsync();
+        var refreshVersion = Interlocked.Increment(ref _recognitionRefreshVersion);
+        _ = RefreshRecognitionAsync(refreshVersion);
+    }
+
+    private async Task RefreshRecognitionAsync(int refreshVersion)
+    {
+        await _recognitionGate.WaitAsync().ConfigureAwait(false);
+        try
+        {
+            if (refreshVersion != Volatile.Read(ref _recognitionRefreshVersion) || !_engine.Recognition.IsAvailable)
+            {
+                return;
+            }
+
+            await _engine.Recognition.ResetAsync().ConfigureAwait(false);
+
+            if (refreshVersion != Volatile.Read(ref _recognitionRefreshVersion) || !IsDictationEnabled)
+            {
+                return;
+            }
+
+            await EnsureDictationMatchesPreferenceAsync().ConfigureAwait(false);
+        }
+        finally
+        {
+            _recognitionGate.Release();
+        }
     }
 
     private async Task OpenSpeechPrivacySettingsAsync()
@@ -952,6 +1072,8 @@ public sealed class MainViewModel : ObservableObject
         };
     }
 }
+
+
 
 
 
