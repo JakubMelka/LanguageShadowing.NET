@@ -83,14 +83,13 @@ public sealed class MainViewModel : ObservableObject
     private double _speechRate = 1.0;
     private double _speechPitch = 1.0;
     private double _speechVolume = 1.0;
-    private double _positionSeconds;
-    private double _durationSeconds;
     private string _statusMessage = "Ready.";
+    private readonly SerialTaskQueue _playbackSnapshotQueue = new();
+    private PlaybackState _playback = PlaybackState.Idle;
     private string _recognitionAvailabilityText = "Dictation is off.";
     private string _shadowingSummary = "The score will appear after recognition starts.";
     private string _scoreColorHex = "#A0A7B8";
     private int? _shadowingScore;
-    private PlaybackStatus _currentPlaybackStatus = PlaybackStatus.Idle;
     private RecognitionStatus _currentRecognitionStatus = RecognitionStatus.Idle;
     private int _recognitionRefreshVersion;
 
@@ -208,8 +207,7 @@ public sealed class MainViewModel : ObservableObject
             {
                 _preparedSignature = null;
                 _preparedSynthesis = null;
-                PositionSeconds = 0;
-                DurationSeconds = 0;
+                Playback = PlaybackState.Idle;
                 WaveformSamples = Array.Empty<float>();
                 ClearRecognizedTextState();
                 RequestRecognitionRefresh();
@@ -300,29 +298,33 @@ public sealed class MainViewModel : ObservableObject
         private set => SetProperty(ref _waveformSamples, value);
     }
 
-    public double PositionSeconds
+    public PlaybackState Playback
     {
-        get => _positionSeconds;
+        get => _playback;
         private set
         {
-            if (SetProperty(ref _positionSeconds, value))
+            if (SetProperty(ref _playback, value))
             {
-                OnPropertyChanged(nameof(PositionText), nameof(ProgressRatio));
+                OnPropertyChanged(
+                    nameof(CurrentPlaybackStatus),
+                    nameof(PositionSeconds),
+                    nameof(DurationSeconds),
+                    nameof(PositionText),
+                    nameof(DurationText),
+                    nameof(ProgressMaximum),
+                    nameof(ProgressRatio),
+                    nameof(IsPlaying),
+                    nameof(IsPaused),
+                    nameof(CanSeek),
+                    nameof(CanEditSourceText));
+                NotifyCommands();
             }
         }
     }
 
-    public double DurationSeconds
-    {
-        get => _durationSeconds;
-        private set
-        {
-            if (SetProperty(ref _durationSeconds, value))
-            {
-                OnPropertyChanged(nameof(DurationText), nameof(ProgressMaximum), nameof(ProgressRatio), nameof(CanSeek));
-            }
-        }
-    }
+    public double PositionSeconds => Playback.Position.TotalSeconds;
+
+    public double DurationSeconds => Playback.Duration.TotalSeconds;
 
     public double ProgressMaximum => DurationSeconds <= 0 ? 1 : DurationSeconds;
 
@@ -374,18 +376,7 @@ public sealed class MainViewModel : ObservableObject
         }
     }
 
-    public PlaybackStatus CurrentPlaybackStatus
-    {
-        get => _currentPlaybackStatus;
-        private set
-        {
-            if (SetProperty(ref _currentPlaybackStatus, value))
-            {
-                OnPropertyChanged(nameof(IsPlaying), nameof(IsPaused), nameof(CanEditSourceText));
-                NotifyCommands();
-            }
-        }
-    }
+    public PlaybackStatus CurrentPlaybackStatus => Playback.Status;
 
     public RecognitionStatus CurrentRecognitionStatus
     {
@@ -411,10 +402,10 @@ public sealed class MainViewModel : ObservableObject
     public bool CanToggleDictation => _engine.Recognition.IsAvailable
         && CurrentRecognitionStatus is not (RecognitionStatus.Starting or RecognitionStatus.Stopping);
 
-    public bool CanSeek => Capabilities.SupportsSeek && DurationSeconds > 0;
+    public bool CanSeek => Capabilities.SupportsSeek && DurationSeconds > 0 && Playback.CanSeek;
 
     public bool CanEditSourceText => !IsBusy
-        && _engine.Playback.CurrentState.Status is not (PlaybackStatus.Playing or PlaybackStatus.Paused);
+        && CurrentPlaybackStatus is not (PlaybackStatus.Playing or PlaybackStatus.Paused);
 
     public int? ShadowingScore
     {
@@ -575,12 +566,12 @@ public sealed class MainViewModel : ObservableObject
                     _preparedSynthesis = await _engine.TextToSpeech.PrepareAsync(request).ConfigureAwait(false);
                     _preparedSignature = requestSignature;
                     await _engine.Playback.LoadAsync(_preparedSynthesis).ConfigureAwait(false);
-                    await ApplyPlaybackSnapshotAsync(_engine.Playback.CurrentState).ConfigureAwait(false);
+                    await EnqueuePlaybackSnapshotAsync(_engine.Playback.CurrentState).ConfigureAwait(false);
                     ApplySynthesisResult(_preparedSynthesis);
                 }
 
                 await _engine.Playback.PlayAsync().ConfigureAwait(false);
-                await ApplyPlaybackSnapshotAsync(_engine.Playback.CurrentState).ConfigureAwait(false);
+                await EnqueuePlaybackSnapshotAsync(_engine.Playback.CurrentState).ConfigureAwait(false);
                 StatusMessage = _engine.Recognition.IsAvailable && IsDictationEnabled
                     ? "Playback is running. Dictation stays active independently."
                     : "Playback is running.";
@@ -614,7 +605,7 @@ public sealed class MainViewModel : ObservableObject
             try
             {
                 await _engine.Playback.PauseAsync().ConfigureAwait(false);
-                await ApplyPlaybackSnapshotAsync(_engine.Playback.CurrentState).ConfigureAwait(false);
+                await EnqueuePlaybackSnapshotAsync(_engine.Playback.CurrentState).ConfigureAwait(false);
                 StatusMessage = "Playback is paused.";
             }
             finally
@@ -645,7 +636,7 @@ public sealed class MainViewModel : ObservableObject
             try
             {
                 await _engine.Playback.StopAsync().ConfigureAwait(false);
-                await ApplyPlaybackSnapshotAsync(_engine.Playback.CurrentState).ConfigureAwait(false);
+                await EnqueuePlaybackSnapshotAsync(_engine.Playback.CurrentState).ConfigureAwait(false);
                 StatusMessage = "Playback stopped.";
             }
             finally
@@ -676,7 +667,7 @@ public sealed class MainViewModel : ObservableObject
             try
             {
                 await _engine.Playback.SeekAsync(TimeSpan.Zero).ConfigureAwait(false);
-                await ApplyPlaybackSnapshotAsync(_engine.Playback.CurrentState).ConfigureAwait(false);
+                await EnqueuePlaybackSnapshotAsync(_engine.Playback.CurrentState).ConfigureAwait(false);
                 StatusMessage = "Position reset to the beginning.";
             }
             finally
@@ -706,7 +697,7 @@ public sealed class MainViewModel : ObservableObject
             try
             {
                 await _engine.Playback.ResetAsync().ConfigureAwait(false);
-                await ApplyPlaybackSnapshotAsync(_engine.Playback.CurrentState).ConfigureAwait(false);
+                await EnqueuePlaybackSnapshotAsync(_engine.Playback.CurrentState).ConfigureAwait(false);
                 _preparedSynthesis = null;
                 _preparedSignature = null;
                 SourceText = string.Empty;
@@ -742,7 +733,7 @@ public sealed class MainViewModel : ObservableObject
 
             var target = TimeSpan.FromSeconds(Math.Clamp(positionSeconds, 0, DurationSeconds));
             await _engine.Playback.SeekAsync(target).ConfigureAwait(false);
-            await ApplyPlaybackSnapshotAsync(_engine.Playback.CurrentState).ConfigureAwait(false);
+            await EnqueuePlaybackSnapshotAsync(_engine.Playback.CurrentState).ConfigureAwait(false);
         }
         finally
         {
@@ -752,8 +743,6 @@ public sealed class MainViewModel : ObservableObject
 
     private void ApplySynthesisResult(SpeechSynthesisResult synthesisResult)
     {
-        PositionSeconds = 0;
-        DurationSeconds = Math.Max(0, synthesisResult.Duration.TotalSeconds);
         WaveformSamples = synthesisResult.Waveform.Samples;
         StatusMessage = synthesisResult.IsEstimated
             ? "Audio prepared in estimated mode."
@@ -950,17 +939,14 @@ public sealed class MainViewModel : ObservableObject
         ClearRecognizedCommand.NotifyCanExecuteChanged();
     }
 
-    private Task ApplyPlaybackSnapshotAsync(PlaybackState state)
+    private Task EnqueuePlaybackSnapshotAsync(PlaybackState state)
     {
-        return _dispatcher.RunAsync(() => ApplyPlaybackSnapshot(state));
+        return _playbackSnapshotQueue.Enqueue(() => _dispatcher.RunAsync(() => ApplyPlaybackSnapshot(state)));
     }
 
     private void ApplyPlaybackSnapshot(PlaybackState state)
     {
-        CurrentPlaybackStatus = state.Status;
-        PositionSeconds = state.Position.TotalSeconds;
-        DurationSeconds = Math.Max(DurationSeconds, state.Duration.TotalSeconds);
-
+        Playback = state;
         if (!string.IsNullOrWhiteSpace(state.Message)
             && state.Status is PlaybackStatus.Ready or PlaybackStatus.Completed or PlaybackStatus.Error)
         {
@@ -978,7 +964,7 @@ public sealed class MainViewModel : ObservableObject
     /// </remarks>
     private void OnPlaybackStateChanged(object? sender, PlaybackStateChangedEventArgs e)
     {
-        _ = ApplyPlaybackSnapshotAsync(e.State);
+        _ = EnqueuePlaybackSnapshotAsync(e.State);
     }
 
     /// <summary>
@@ -1072,6 +1058,9 @@ public sealed class MainViewModel : ObservableObject
         };
     }
 }
+
+
+
 
 
 

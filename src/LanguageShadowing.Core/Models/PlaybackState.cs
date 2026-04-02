@@ -24,3 +24,5 @@ public sealed record PlaybackState(
     /// </summary>
     public static PlaybackState Idle { get; } = new(PlaybackStatus.Idle, TimeSpan.Zero, TimeSpan.Zero, false, false);
 }
+
+
