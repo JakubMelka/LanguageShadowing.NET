@@ -8,14 +8,17 @@
             <Color x:Key="CardBackground">#FFFFFF</Color>
             <Color x:Key="SurfaceMuted">#EEF2F8</Color>
             <Color x:Key="SurfaceHover">#E2E8F2</Color>
+            <Color x:Key="SurfacePressed">#D7DFEC</Color>
             <Color x:Key="BorderColor">#D6DEEA</Color>
             <Color x:Key="BorderHoverColor">#C1CBDC</Color>
             <Color x:Key="PrimaryText">#1B2430</Color>
             <Color x:Key="SecondaryText">#667286</Color>
             <Color x:Key="AccentColor">#2D7FF9</Color>
             <Color x:Key="AccentHoverColor">#1F6EE3</Color>
+            <Color x:Key="AccentPressedColor">#175FC7</Color>
             <Color x:Key="AccentSoft">#DCE9FF</Color>
             <Color x:Key="AccentSoftHover">#C8DCFF</Color>
+            <Color x:Key="AccentSoftPressed">#B7D0FF</Color>
 
             <Style TargetType="ContentPage">
                 <Setter Property="BackgroundColor" Value="{DynamicResource PageBackground}" />
@@ -53,6 +56,11 @@
                                     <Setter Property="BackgroundColor" Value="{DynamicResource AccentSoftHover}" />
                                 </VisualState.Setters>
                             </VisualState>
+                            <VisualState x:Name="Pressed">
+                                <VisualState.Setters>
+                                    <Setter Property="BackgroundColor" Value="{DynamicResource AccentSoftPressed}" />
+                                </VisualState.Setters>
+                            </VisualState>
                             <VisualState x:Name="Disabled" />
                         </VisualStateGroup>
                     </VisualStateGroupList>
@@ -77,6 +85,12 @@
                                     <Setter Property="BorderColor" Value="{DynamicResource BorderHoverColor}" />
                                 </VisualState.Setters>
                             </VisualState>
+                            <VisualState x:Name="Pressed">
+                                <VisualState.Setters>
+                                    <Setter Property="BackgroundColor" Value="{DynamicResource SurfacePressed}" />
+                                    <Setter Property="BorderColor" Value="{DynamicResource BorderHoverColor}" />
+                                </VisualState.Setters>
+                            </VisualState>
                             <VisualState x:Name="Disabled" />
                         </VisualStateGroup>
                     </VisualStateGroupList>
@@ -95,6 +109,12 @@
                                 <VisualState.Setters>
                                     <Setter Property="BackgroundColor" Value="{DynamicResource AccentHoverColor}" />
                                     <Setter Property="BorderColor" Value="{DynamicResource AccentHoverColor}" />
+                                </VisualState.Setters>
+                            </VisualState>
+                            <VisualState x:Name="Pressed">
+                                <VisualState.Setters>
+                                    <Setter Property="BackgroundColor" Value="{DynamicResource AccentPressedColor}" />
+                                    <Setter Property="BorderColor" Value="{DynamicResource AccentPressedColor}" />
                                 </VisualState.Setters>
                             </VisualState>
                             <VisualState x:Name="Disabled" />
