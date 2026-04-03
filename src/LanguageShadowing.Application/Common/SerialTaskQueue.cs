@@ -11,6 +11,14 @@ public sealed class SerialTaskQueue
     private readonly object _sync = new();
     private Task _tail = Task.CompletedTask;
 
+    public Task WhenCurrentCompleted()
+    {
+        lock (_sync)
+        {
+            return _tail;
+        }
+    }
+
     public Task Enqueue(Func<Task> workItem)
     {
         ArgumentNullException.ThrowIfNull(workItem);
@@ -35,3 +43,4 @@ public sealed class SerialTaskQueue
         await workItem().ConfigureAwait(false);
     }
 }
+

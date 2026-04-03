@@ -57,7 +57,6 @@ public sealed class WindowsAudioPlaybackController : IAudioPlaybackController
             return Task.CompletedTask;
         }
 
-        _player.Play();
         Publish(_state with
         {
             Status = PlaybackStatus.Playing,
@@ -66,6 +65,7 @@ public sealed class WindowsAudioPlaybackController : IAudioPlaybackController
             IsBusy = false,
             Message = "Playing synthesized speech."
         });
+        _player.Play();
         return Task.CompletedTask;
     }
 
@@ -145,6 +145,7 @@ public sealed class WindowsAudioPlaybackController : IAudioPlaybackController
 
         Publish(_state with
         {
+            Status = GetEffectiveStatus(sender),
             Position = sender.Position,
             Duration = _loaded.Duration
         });
@@ -158,7 +159,26 @@ public sealed class WindowsAudioPlaybackController : IAudioPlaybackController
         }
 
         var duration = sender.NaturalDuration > TimeSpan.Zero ? sender.NaturalDuration : _loaded.Duration;
-        Publish(_state with { Duration = duration });
+        Publish(_state with
+        {
+            Status = GetEffectiveStatus(sender),
+            Duration = duration
+        });
+    }
+
+    private void OnPlaybackStateChanged(MediaPlaybackSession sender, object args)
+    {
+        if (_loaded is null)
+        {
+            return;
+        }
+
+        Publish(_state with
+        {
+            Status = GetEffectiveStatus(sender),
+            Position = sender.Position,
+            Duration = sender.NaturalDuration > TimeSpan.Zero ? sender.NaturalDuration : _loaded.Duration
+        });
     }
 
     private void OnMediaEnded(MediaPlayer sender, object args)
@@ -188,6 +208,7 @@ public sealed class WindowsAudioPlaybackController : IAudioPlaybackController
         player.MediaFailed += OnMediaFailed;
         player.PlaybackSession.PositionChanged += OnPositionChanged;
         player.PlaybackSession.NaturalDurationChanged += OnNaturalDurationChanged;
+        player.PlaybackSession.PlaybackStateChanged += OnPlaybackStateChanged;
         return player;
     }
 
@@ -197,8 +218,24 @@ public sealed class WindowsAudioPlaybackController : IAudioPlaybackController
         _player.MediaFailed -= OnMediaFailed;
         _player.PlaybackSession.PositionChanged -= OnPositionChanged;
         _player.PlaybackSession.NaturalDurationChanged -= OnNaturalDurationChanged;
+        _player.PlaybackSession.PlaybackStateChanged -= OnPlaybackStateChanged;
         _player.Source = null;
         _player.Dispose();
+    }
+
+    private PlaybackStatus GetEffectiveStatus(MediaPlaybackSession session)
+    {
+        return session.PlaybackState switch
+        {
+            MediaPlaybackState.Playing => PlaybackStatus.Playing,
+            MediaPlaybackState.Paused when _state.Status is PlaybackStatus.Stopped or PlaybackStatus.Completed or PlaybackStatus.Error
+                => _state.Status,
+            MediaPlaybackState.Paused => PlaybackStatus.Paused,
+            MediaPlaybackState.None when _state.Status is PlaybackStatus.Stopped or PlaybackStatus.Completed or PlaybackStatus.Error
+                => _state.Status,
+            MediaPlaybackState.None => _loaded is null ? PlaybackStatus.Idle : PlaybackStatus.Ready,
+            _ => _state.Status
+        };
     }
 
     private void Publish(PlaybackState state)
@@ -218,5 +255,3 @@ public sealed class WindowsAudioPlaybackController : IAudioPlaybackController
     }
 }
 #endif
-
-
