@@ -97,6 +97,26 @@
                 </Setter>
             </Style>
 
+            <Style x:Key="ToolbarStaticButtonStyle" TargetType="Button" BasedOn="{StaticResource ToolbarButtonStyle}">
+                <Setter Property="BackgroundColor" Value="{DynamicResource SurfaceMuted}" />
+                <Setter Property="TextColor" Value="{DynamicResource PrimaryText}" />
+                <Setter Property="BorderColor" Value="{DynamicResource BorderColor}" />
+                <Setter Property="VisualStateManager.VisualStateGroups">
+                    <VisualStateGroupList>
+                        <VisualStateGroup x:Name="CommonStates">
+                            <VisualState x:Name="Normal" />
+                            <VisualState x:Name="PointerOver">
+                                <VisualState.Setters>
+                                    <Setter Property="BackgroundColor" Value="{DynamicResource SurfaceHover}" />
+                                    <Setter Property="BorderColor" Value="{DynamicResource BorderHoverColor}" />
+                                </VisualState.Setters>
+                            </VisualState>
+                            <VisualState x:Name="Pressed" />
+                            <VisualState x:Name="Disabled" />
+                        </VisualStateGroup>
+                    </VisualStateGroupList>
+                </Setter>
+            </Style>
             <Style x:Key="ToolbarPrimaryButtonStyle" TargetType="Button" BasedOn="{StaticResource ToolbarButtonStyle}">
                 <Setter Property="BackgroundColor" Value="{DynamicResource AccentColor}" />
                 <Setter Property="TextColor" Value="White" />
@@ -145,3 +165,5 @@
         </ResourceDictionary>
     </Application.Resources>
 </Application>
+
+

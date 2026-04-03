@@ -131,10 +131,10 @@
                                 Style="{StaticResource ToolbarPrimaryButtonStyle}"
                                 Command="{Binding ToggleDictationCommand}" />
                         <Button Text="Speech Settings"
-                                Style="{StaticResource ToolbarButtonStyle}"
+                                Style="{StaticResource ToolbarStaticButtonStyle}"
                                 Command="{Binding OpenSpeechPrivacySettingsCommand}" />
                         <Button Text="Microphone Settings"
-                                Style="{StaticResource ToolbarButtonStyle}"
+                                Style="{StaticResource ToolbarStaticButtonStyle}"
                                 Command="{Binding OpenMicrophonePrivacySettingsCommand}" />
                     </HorizontalStackLayout>
 
@@ -224,5 +224,6 @@
         </Border>
     </Grid>
 </ContentPage>
+
 
 
