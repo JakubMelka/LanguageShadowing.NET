@@ -4,6 +4,7 @@
     <SingleProject>false</SingleProject>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <IsPublishable>false</IsPublishable>
     <AppxGeneratePriEnabled>false</AppxGeneratePriEnabled>
     <IncludeProjectPriFile>false</IncludeProjectPriFile>
     <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.19041.0</SupportedOSPlatformVersion>
