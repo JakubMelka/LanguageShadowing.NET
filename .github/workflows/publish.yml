@@ -30,8 +30,6 @@ jobs:
       - name: Restore dependencies
         run: >
           dotnet restore ${{ env.PROJECT_PATH }}
-          --configuration ${{ env.BUILD_CONFIGURATION }}
-          --framework ${{ env.TARGET_FRAMEWORK }}
           --runtime ${{ env.RUNTIME_IDENTIFIER }}
           -p:PublishReadyToRun=${{ env.PUBLISH_READY_TO_RUN }}
           -p:WindowsPackageType=MSIX

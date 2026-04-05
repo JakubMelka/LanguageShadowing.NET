@@ -33,8 +33,6 @@ jobs:
       - name: Restore dependencies
         run: >
           dotnet restore ${{ env.PROJECT_PATH }}
-          --configuration ${{ env.BUILD_CONFIGURATION }}
-          --framework ${{ env.TARGET_FRAMEWORK }}
           --runtime ${{ env.RUNTIME_IDENTIFIER }}
 
       - name: Build Windows app
