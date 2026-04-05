@@ -21,7 +21,9 @@ jobs:
         run: dotnet workload install maui-windows
 
       - name: Restore dependencies
-        run: dotnet restore src/LanguageShadowing.App/LanguageShadowing.App.csproj
+        run: >
+          dotnet restore src/LanguageShadowing.App/LanguageShadowing.App.csproj
+          --runtime win-x64
 
       - name: Publish unsigned MSIX package
         run: >
