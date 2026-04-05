@@ -29,8 +29,11 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\LanguageShadowing.Core\LanguageShadowing.Core.csproj" />
-    <ProjectReference Include="..\LanguageShadowing.Application\LanguageShadowing.Application.csproj" />
-    <ProjectReference Include="..\LanguageShadowing.Infrastructure\LanguageShadowing.Infrastructure.csproj" />
+    <ProjectReference Include="..\LanguageShadowing.Core\LanguageShadowing.Core.csproj"
+                      GlobalPropertiesToRemove="GenerateAppxPackageOnBuild;AppxPackageDir;AppxPackageSigningEnabled;WindowsPackageType" />
+    <ProjectReference Include="..\LanguageShadowing.Application\LanguageShadowing.Application.csproj"
+                      GlobalPropertiesToRemove="GenerateAppxPackageOnBuild;AppxPackageDir;AppxPackageSigningEnabled;WindowsPackageType" />
+    <ProjectReference Include="..\LanguageShadowing.Infrastructure\LanguageShadowing.Infrastructure.csproj"
+                      GlobalPropertiesToRemove="GenerateAppxPackageOnBuild;AppxPackageDir;AppxPackageSigningEnabled;WindowsPackageType" />
   </ItemGroup>
 </Project>
