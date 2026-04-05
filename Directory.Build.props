@@ -2,6 +2,7 @@
   <PropertyGroup>
     <BaseOutputPath>$(MSBuildThisFileDirectory)build\$(MSBuildProjectName)\</BaseOutputPath>
     <BaseIntermediateOutputPath>$(MSBuildThisFileDirectory)obj\$(MSBuildProjectName)\</BaseIntermediateOutputPath>
+    <AppendRuntimeIdentifierToOutputPath Condition="'$(RuntimeIdentifier)' != ''">true</AppendRuntimeIdentifierToOutputPath>
     <DefaultItemExcludes>$(DefaultItemExcludes);$(MSBuildProjectDirectory)\bin\**;$(MSBuildProjectDirectory)\obj\**</DefaultItemExcludes>
   </PropertyGroup>
 </Project>
