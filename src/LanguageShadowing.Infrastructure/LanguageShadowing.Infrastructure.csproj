@@ -1,7 +1,6 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFramework>net9.0-windows10.0.19041.0</TargetFramework>
-    <UseMaui>true</UseMaui>
     <SingleProject>false</SingleProject>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
@@ -10,6 +9,7 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Maui.Controls" Version="9.0.111" />
+    <PackageReference Include="Microsoft.Maui.Essentials" Version="9.0.111" />
     <ProjectReference Include="..\LanguageShadowing.Core\LanguageShadowing.Core.csproj" />
     <ProjectReference Include="..\LanguageShadowing.Application\LanguageShadowing.Application.csproj" />
   </ItemGroup>
