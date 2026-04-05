@@ -115,7 +115,7 @@ Clone the repository and restore/build the solution:
 
 ```powershell
 git clone <your-fork-or-repo-url>
-cd LangShadowing
+cd LanguageShadowing
 dotnet workload install maui-windows
 dotnet restore
 dotnet build src/LanguageShadowing.App/LanguageShadowing.App.csproj -f net9.0-windows10.0.19041.0
