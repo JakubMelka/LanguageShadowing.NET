@@ -34,6 +34,23 @@ namespace LanguageShadowing.Application.ViewModels;
 /// <summary>
 /// Main orchestration view model for the application.
 /// </summary>
+/// <remarks>
+/// <para>
+/// This type is the session coordinator for the entire MAUI front end. It does not synthesize speech, play audio,
+/// or run recognition by itself. Instead, it translates user intent into calls to the platform services exposed by
+/// <see cref="ISpeechEngine"/> and then projects their results back into bindable UI state.
+/// </para>
+/// <para>
+/// The most important design constraint in this class is not plain MVVM binding, but coordination of asynchronous,
+/// event-driven workflows. Playback, speech synthesis, and recognition all operate independently and can publish state
+/// changes from callbacks that do not naturally arrive in UI order. To avoid races between commands and service events,
+/// all session mutations are serialized through <see cref="_sessionQueue"/>.
+/// </para>
+/// <para>
+/// In practical terms, button commands and external service callbacks both flow into one ordered session pipeline,
+/// while actual bindable property updates are marshalled back to the UI thread via <see cref="IAppDispatcher"/>.
+/// </para>
+/// </remarks>
 public sealed class MainViewModel : ObservableObject
 {
     private const string AutomaticThemeOption = "Automatic";
@@ -53,6 +70,9 @@ public sealed class MainViewModel : ObservableObject
     private readonly IAppDispatcher _dispatcher;
     private readonly IAppThemeService _themeService;
     private readonly ISettingsLauncher _settingsLauncher;
+    /// <summary>
+    /// Serializes all session mutations so commands and external callbacks cannot update the same state concurrently.
+    /// </summary>
     private readonly SerialTaskQueue _sessionQueue = new();
     private readonly ObservableCollection<VoiceInfo> _voices = new();
     private readonly ObservableCollection<string> _engines = new();
@@ -78,8 +98,20 @@ public sealed class MainViewModel : ObservableObject
     private string _scoreColorHex = "#A0A7B8";
     private int? _shadowingScore;
     private RecognitionStatus _currentRecognitionStatus = RecognitionStatus.Idle;
+    /// <summary>
+    /// Monotonic version used to invalidate stale recognition refresh requests.
+    /// </summary>
     private int _recognitionRefreshVersion;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="MainViewModel"/> class.
+    /// </summary>
+    /// <param name="engine">Aggregates the active speech synthesis, playback, recognition, and voice catalog services.</param>
+    /// <param name="settingsStore">Persists user-selected voice, theme, playback profile, and dictation preference.</param>
+    /// <param name="analyzer">Computes a lightweight shadowing score from source and recognized text.</param>
+    /// <param name="dispatcher">Executes UI-bound state changes on the application's main thread.</param>
+    /// <param name="themeService">Applies the selected visual theme to the app shell.</param>
+    /// <param name="settingsLauncher">Opens operating system privacy settings when speech permissions need attention.</param>
     public MainViewModel(
         ISpeechEngine engine,
         IShadowingSettingsStore settingsStore,
@@ -120,30 +152,73 @@ public sealed class MainViewModel : ObservableObject
         _engine.Recognition.RecognitionUpdated += OnRecognitionUpdated;
     }
 
+    /// <summary>
+    /// Gets the available voices exposed by the active speech engine.
+    /// </summary>
     public ReadOnlyObservableCollection<VoiceInfo> Voices { get; }
 
+    /// <summary>
+    /// Gets the list of engine names shown in the UI.
+    /// </summary>
+    /// <remarks>
+    /// The current application uses a single concrete engine, but the property still exposes a list because the UI is
+    /// designed like a normal picker and the abstraction leaves room for future engine selection.
+    /// </remarks>
     public ReadOnlyObservableCollection<string> Engines { get; }
 
+    /// <summary>
+    /// Gets the user-facing theme options displayed in the appearance picker.
+    /// </summary>
     public IReadOnlyList<string> ThemeOptions { get; }
 
+    /// <summary>
+    /// Gets the command that lazily loads persisted settings, voices, and engine capabilities.
+    /// </summary>
     public AsyncRelayCommand InitializeCommand { get; }
 
+    /// <summary>
+    /// Gets the command that starts playback or resumes a paused session.
+    /// </summary>
     public AsyncRelayCommand PlayCommand { get; }
 
+    /// <summary>
+    /// Gets the command that pauses playback when the active engine supports pause.
+    /// </summary>
     public AsyncRelayCommand PauseCommand { get; }
 
+    /// <summary>
+    /// Gets the command that stops playback and rewinds the prepared media to the beginning.
+    /// </summary>
     public AsyncRelayCommand StopCommand { get; }
 
+    /// <summary>
+    /// Gets the command that seeks the prepared media to the start without discarding the session.
+    /// </summary>
     public AsyncRelayCommand RewindCommand { get; }
 
+    /// <summary>
+    /// Gets the command that clears playback, cached synthesis, transcript state, and source text.
+    /// </summary>
     public AsyncRelayCommand ResetCommand { get; }
 
+    /// <summary>
+    /// Gets the command that toggles the independent dictation preference on or off.
+    /// </summary>
     public AsyncRelayCommand ToggleDictationCommand { get; }
 
+    /// <summary>
+    /// Gets the command that opens operating system speech privacy settings.
+    /// </summary>
     public AsyncRelayCommand OpenSpeechPrivacySettingsCommand { get; }
 
+    /// <summary>
+    /// Gets the command that opens operating system microphone privacy settings.
+    /// </summary>
     public AsyncRelayCommand OpenMicrophonePrivacySettingsCommand { get; }
 
+    /// <summary>
+    /// Gets the command that clears the recognized transcript and refreshes recognition state.
+    /// </summary>
     public AsyncRelayCommand ClearRecognizedCommand { get; }
 
     public SpeechEngineCapabilities Capabilities
@@ -165,6 +240,12 @@ public sealed class MainViewModel : ObservableObject
         set => SetProperty(ref _selectedEngineName, value ?? _engine.Name);
     }
 
+    /// <summary>
+    /// Gets or sets the currently selected synthesis voice.
+    /// </summary>
+    /// <remarks>
+    /// Changing the voice invalidates the prepared synthesis signature because any cached audio is no longer reusable.
+    /// </remarks>
     public VoiceInfo? SelectedVoice
     {
         get => _selectedVoice;
@@ -185,6 +266,14 @@ public sealed class MainViewModel : ObservableObject
         ? string.Empty
         : SelectedVoice!.Gender!;
 
+    /// <summary>
+    /// Gets or sets the source text that will be synthesized and used as the comparison target for scoring.
+    /// </summary>
+    /// <remarks>
+    /// Updating the source text is a session reset boundary. The current prepared synthesis becomes invalid, playback
+    /// returns to idle, the waveform is cleared, and the current recognition transcript is reset because it no longer
+    /// corresponds to the same source material.
+    /// </remarks>
     public string SourceText
     {
         get => _sourceText;
@@ -285,6 +374,9 @@ public sealed class MainViewModel : ObservableObject
         private set => SetProperty(ref _waveformSamples, value);
     }
 
+    /// <summary>
+    /// Gets the latest immutable playback snapshot applied to the UI.
+    /// </summary>
     public PlaybackState Playback
     {
         get => _playback;
@@ -335,6 +427,12 @@ public sealed class MainViewModel : ObservableObject
 
     public bool ShowRecognitionSettingsButtons => _engine.Recognition.IsAvailable;
 
+    /// <summary>
+    /// Gets a value indicating whether dictation is currently enabled as a user preference.
+    /// </summary>
+    /// <remarks>
+    /// This flag represents the desired microphone state, not a guarantee that recognition is actively listening.
+    /// </remarks>
     public bool IsDictationEnabled
     {
         get => _isDictationEnabled;
@@ -420,20 +518,49 @@ public sealed class MainViewModel : ObservableObject
         private set => SetProperty(ref _shadowingSummary, value);
     }
 
+    /// <summary>
+    /// Lazily initializes the session model by loading persisted settings, engine capabilities, and available voices.
+    /// </summary>
+    /// <remarks>
+    /// The public entry point simply routes the operation through the serialized session queue so initialization cannot
+    /// race with playback or recognition updates.
+    /// </remarks>
     public Task InitializeAsync() => EnqueueSessionAsync(InitializeCoreAsync);
 
+    /// <summary>
+    /// Starts playback or resumes it from pause when a compatible prepared synthesis already exists.
+    /// </summary>
     public Task PlayAsync() => EnqueueSessionAsync(PlayCoreAsync);
 
+    /// <summary>
+    /// Pauses playback when the active engine supports pause.
+    /// </summary>
     public Task PauseAsync() => EnqueueSessionAsync(PauseCoreAsync);
 
+    /// <summary>
+    /// Stops playback and rewinds the prepared media to the beginning.
+    /// </summary>
     public Task StopAsync() => EnqueueSessionAsync(StopCoreAsync);
 
+    /// <summary>
+    /// Seeks playback to the beginning without discarding the current prepared synthesis.
+    /// </summary>
     public Task RewindAsync() => EnqueueSessionAsync(RewindCoreAsync);
 
+    /// <summary>
+    /// Fully resets the current shadowing session.
+    /// </summary>
     public Task ResetAsync() => EnqueueSessionAsync(ResetCoreAsync);
 
+    /// <summary>
+    /// Seeks playback to the requested position in seconds.
+    /// </summary>
+    /// <param name="positionSeconds">The target playback position expressed in seconds.</param>
     public Task SeekAsync(double positionSeconds) => EnqueueSessionAsync(() => SeekCoreAsync(positionSeconds));
 
+    /// <summary>
+    /// Performs the one-time initialization workflow behind <see cref="InitializeAsync"/>.
+    /// </summary>
     private async Task InitializeCoreAsync()
     {
         if (_isInitialized)
@@ -492,6 +619,14 @@ public sealed class MainViewModel : ObservableObject
         }
     }
 
+    /// <summary>
+    /// Performs the playback start/resume workflow behind <see cref="PlayAsync"/>.
+    /// </summary>
+    /// <remarks>
+    /// The method decides whether it can resume from pause or must generate fresh audio. That decision is based on a
+    /// signature built from source text, selected voice, and synthesis settings. If any of those inputs changed, the
+    /// cached synthesis is discarded and replaced before playback starts.
+    /// </remarks>
     private async Task PlayCoreAsync()
     {
         if (string.IsNullOrWhiteSpace(SourceText))
@@ -606,6 +741,13 @@ public sealed class MainViewModel : ObservableObject
         }
     }
 
+    /// <summary>
+    /// Performs the strong reset workflow behind <see cref="ResetAsync"/>.
+    /// </summary>
+    /// <remarks>
+    /// Unlike <see cref="StopCoreAsync"/>, reset discards cached synthesis and clears the editable source text so the
+    /// next session begins from a fully clean baseline.
+    /// </remarks>
     private async Task ResetCoreAsync()
     {
         await RunOnUiAsync(() => IsBusy = true).ConfigureAwait(false);
@@ -651,6 +793,14 @@ public sealed class MainViewModel : ObservableObject
 
     private Task ClearRecognizedAsync() => EnqueueSessionAsync(ClearRecognizedCoreAsync);
 
+    /// <summary>
+    /// Performs the dictation toggle workflow behind <see cref="ToggleDictationAsync"/>.
+    /// </summary>
+    /// <remarks>
+    /// Dictation is managed independently from playback transport. Enabling playback does not automatically start the
+    /// microphone; enabling dictation expresses a persistent preference that the view model then reconciles with the
+    /// current recognition service state.
+    /// </remarks>
     private async Task ToggleDictationCoreAsync()
     {
         if (!_engine.Recognition.IsAvailable)
@@ -727,6 +877,10 @@ public sealed class MainViewModel : ObservableObject
         _ = EnqueueSessionAsync(() => RefreshRecognitionAsync(refreshVersion));
     }
 
+    /// <summary>
+    /// Resets recognition state and restarts listening when the latest preference still requires it.
+    /// </summary>
+    /// <param name="refreshVersion">The captured refresh version that must still match the latest request.</param>
     private async Task RefreshRecognitionAsync(int refreshVersion)
     {
         if (refreshVersion != Volatile.Read(ref _recognitionRefreshVersion) || !_engine.Recognition.IsAvailable)
@@ -744,6 +898,10 @@ public sealed class MainViewModel : ObservableObject
         await EnsureDictationMatchesPreferenceAsync().ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// Executes the supplied action on the application's main UI thread.
+    /// </summary>
+    /// <param name="action">The UI-bound action to execute.</param>
     private Task RunOnUiAsync(Action action)
     {
         return _dispatcher.RunAsync(action);
@@ -759,6 +917,9 @@ public sealed class MainViewModel : ObservableObject
         await _settingsLauncher.OpenAsync("ms-settings:privacy-microphone").ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// Clears transcript-derived UI state without touching recognition service internals.
+    /// </summary>
     private void ClearRecognizedTextState()
     {
         RecognizedText = string.Empty;
@@ -767,6 +928,10 @@ public sealed class MainViewModel : ObservableObject
         ScoreColorHex = "#A0A7B8";
     }
 
+    /// <summary>
+    /// Builds a cache key for the current synthesis inputs.
+    /// </summary>
+    /// <returns>A stable string signature that changes whenever synthesis-relevant inputs change.</returns>
     private string BuildRequestSignature()
     {
         return string.Join(
@@ -778,6 +943,9 @@ public sealed class MainViewModel : ObservableObject
             SpeechVolume.ToString("0.00", CultureInfo.InvariantCulture));
     }
 
+    /// <summary>
+    /// Recomputes the current shadowing assessment from the source and recognized text.
+    /// </summary>
     private void UpdateAssessment()
     {
         var assessment = _analyzer.Assess(SourceText, RecognizedText);
@@ -786,6 +954,11 @@ public sealed class MainViewModel : ObservableObject
         ScoreColorHex = ComputeScoreColor(assessment.Score);
     }
 
+    /// <summary>
+    /// Maps a score to a red-to-green color used by the transcript score badge.
+    /// </summary>
+    /// <param name="score">The score to convert.</param>
+    /// <returns>A hexadecimal RGB color string.</returns>
     private static string ComputeScoreColor(int? score)
     {
         if (score is null)
@@ -800,6 +973,13 @@ public sealed class MainViewModel : ObservableObject
         return $"#{red:X2}{green:X2}{blue:X2}";
     }
 
+    /// <summary>
+    /// Persists the latest user-facing settings snapshot when initialization already completed.
+    /// </summary>
+    /// <remarks>
+    /// The method intentionally does nothing before initialization so the initial settings load does not immediately
+    /// write the same values back to storage while the first snapshot is still being applied.
+    /// </remarks>
     private void PersistSettings()
     {
         if (!_isInitialized)
@@ -830,6 +1010,10 @@ public sealed class MainViewModel : ObservableObject
         ClearRecognizedCommand.NotifyCanExecuteChanged();
     }
 
+    /// <summary>
+    /// Enqueues a unit of session work so it runs in-order with every other command or callback mutation.
+    /// </summary>
+    /// <param name="workItem">The asynchronous work item to serialize.</param>
     private Task EnqueueSessionAsync(Func<Task> workItem)
     {
         return _sessionQueue.Enqueue(workItem);
@@ -850,11 +1034,17 @@ public sealed class MainViewModel : ObservableObject
         }
     }
 
+    /// <summary>
+    /// Receives playback state updates from the engine and serializes them into the main session flow.
+    /// </summary>
     private void OnPlaybackStateChanged(object? sender, PlaybackStateChangedEventArgs e)
     {
         _ = EnqueueSessionAsync(() => ApplyPlaybackSnapshotAsync(e.State));
     }
 
+    /// <summary>
+    /// Receives recognition lifecycle updates from the engine and applies them on the UI thread in queue order.
+    /// </summary>
     private void OnRecognitionStateChanged(object? sender, RecognitionStateChangedEventArgs e)
     {
         _ = EnqueueSessionAsync(() => RunOnUiAsync(() =>
@@ -864,6 +1054,9 @@ public sealed class MainViewModel : ObservableObject
         }));
     }
 
+    /// <summary>
+    /// Receives recognition transcript updates and recomputes the shadowing assessment.
+    /// </summary>
     private void OnRecognitionUpdated(object? sender, RecognitionUpdatedEventArgs e)
     {
         _ = EnqueueSessionAsync(() => RunOnUiAsync(() =>
@@ -873,6 +1066,12 @@ public sealed class MainViewModel : ObservableObject
         }));
     }
 
+    /// <summary>
+    /// Builds the user-facing recognition availability/status text from the current lifecycle state.
+    /// </summary>
+    /// <param name="status">The recognition lifecycle status.</param>
+    /// <param name="message">An optional engine-provided diagnostic or status message.</param>
+    /// <returns>A short user-facing description suitable for the recognition controls area.</returns>
     private string BuildRecognitionAvailabilityText(RecognitionStatus status, string? message)
     {
         if (!_engine.Recognition.IsAvailable)
@@ -931,4 +1130,8 @@ public sealed class MainViewModel : ObservableObject
         };
     }
 }
+
+
+
+
 
