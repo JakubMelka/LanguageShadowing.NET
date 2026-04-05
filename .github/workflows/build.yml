@@ -1,0 +1,39 @@
+name: build
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-windows:
+    name: build
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 9 SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 9.0.x
+
+      - name: Install .NET MAUI Windows workload
+        run: dotnet workload install maui-windows
+
+      - name: Restore dependencies
+        run: dotnet restore src/LanguageShadowing.App/LanguageShadowing.App.csproj
+
+      - name: Build Windows app
+        run: >
+          dotnet build src/LanguageShadowing.App/LanguageShadowing.App.csproj
+          --configuration Release
+          --framework net9.0-windows10.0.19041.0
+          --no-restore
+          -p:ContinuousIntegrationBuild=true
+
+      - name: Upload build output
+        uses: actions/upload-artifact@v4
+        with:
+          name: language-shadowing-build
+          path: build/LanguageShadowing.App/**
+          if-no-files-found: error

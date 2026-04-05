@@ -1,0 +1,44 @@
+name: publish
+
+on:
+  workflow_dispatch:
+
+jobs:
+  publish-msix:
+    name: publish
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 9 SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 9.0.x
+
+      - name: Install .NET MAUI Windows workload
+        run: dotnet workload install maui-windows
+
+      - name: Restore dependencies
+        run: dotnet restore src/LanguageShadowing.App/LanguageShadowing.App.csproj
+
+      - name: Publish unsigned MSIX package
+        run: >
+          dotnet publish src/LanguageShadowing.App/LanguageShadowing.App.csproj
+          --configuration Release
+          --framework net9.0-windows10.0.19041.0
+          --runtime win-x64
+          --no-restore
+          -p:WindowsPackageType=MSIX
+          -p:GenerateAppxPackageOnBuild=true
+          -p:AppxPackageSigningEnabled=false
+          -p:AppxPackageDir=${{ github.workspace }}\artifacts\msix\
+          -p:ContinuousIntegrationBuild=true
+
+      - name: Upload MSIX artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: language-shadowing-msix
+          path: artifacts/msix/**
+          if-no-files-found: error
