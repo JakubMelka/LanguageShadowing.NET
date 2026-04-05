@@ -1,7 +1,7 @@
 # Language Shadowing
 
 <p align="center">
-  <img src="src/logo/language_shadowing_logo_4.svg" alt="Language Shadowing logo" width="180" />
+  <img src="src/LanguageShadowing.App/Resources/AppIcon/languageshadowinglogo.svg" alt="Language Shadowing logo" width="180" />
 </p>
 
 <p align="center">
