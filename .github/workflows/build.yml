@@ -7,6 +7,12 @@ on:
       - master
   workflow_dispatch:
 
+env:
+  PROJECT_PATH: src/LanguageShadowing.App/LanguageShadowing.App.csproj
+  BUILD_CONFIGURATION: Release
+  TARGET_FRAMEWORK: net9.0-windows10.0.19041.0
+  RUNTIME_IDENTIFIER: win-x64
+
 jobs:
   build-windows:
     name: build
@@ -26,15 +32,17 @@ jobs:
 
       - name: Restore dependencies
         run: >
-          dotnet restore src/LanguageShadowing.App/LanguageShadowing.App.csproj
-          --runtime win-x64
+          dotnet restore ${{ env.PROJECT_PATH }}
+          --configuration ${{ env.BUILD_CONFIGURATION }}
+          --framework ${{ env.TARGET_FRAMEWORK }}
+          --runtime ${{ env.RUNTIME_IDENTIFIER }}
 
       - name: Build Windows app
         run: >
-          dotnet build src/LanguageShadowing.App/LanguageShadowing.App.csproj
-          --configuration Release
-          --framework net9.0-windows10.0.19041.0
-          --runtime win-x64
+          dotnet build ${{ env.PROJECT_PATH }}
+          --configuration ${{ env.BUILD_CONFIGURATION }}
+          --framework ${{ env.TARGET_FRAMEWORK }}
+          --runtime ${{ env.RUNTIME_IDENTIFIER }}
           --no-restore
           -p:ContinuousIntegrationBuild=true
 

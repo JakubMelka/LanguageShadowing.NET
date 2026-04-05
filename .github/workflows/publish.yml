@@ -3,6 +3,13 @@ name: publish
 on:
   workflow_dispatch:
 
+env:
+  PROJECT_PATH: src/LanguageShadowing.App/LanguageShadowing.App.csproj
+  BUILD_CONFIGURATION: Release
+  TARGET_FRAMEWORK: net9.0-windows10.0.19041.0
+  RUNTIME_IDENTIFIER: win-x64
+  PUBLISH_READY_TO_RUN: true
+
 jobs:
   publish-msix:
     name: publish
@@ -22,20 +29,27 @@ jobs:
 
       - name: Restore dependencies
         run: >
-          dotnet restore src/LanguageShadowing.App/LanguageShadowing.App.csproj
-          --runtime win-x64
+          dotnet restore ${{ env.PROJECT_PATH }}
+          --configuration ${{ env.BUILD_CONFIGURATION }}
+          --framework ${{ env.TARGET_FRAMEWORK }}
+          --runtime ${{ env.RUNTIME_IDENTIFIER }}
+          -p:PublishReadyToRun=${{ env.PUBLISH_READY_TO_RUN }}
+          -p:WindowsPackageType=MSIX
+          -p:GenerateAppxPackageOnBuild=true
+          -p:AppxPackageSigningEnabled=false
 
       - name: Publish unsigned MSIX package
         run: >
-          dotnet publish src/LanguageShadowing.App/LanguageShadowing.App.csproj
-          --configuration Release
-          --framework net9.0-windows10.0.19041.0
-          --runtime win-x64
+          dotnet publish ${{ env.PROJECT_PATH }}
+          --configuration ${{ env.BUILD_CONFIGURATION }}
+          --framework ${{ env.TARGET_FRAMEWORK }}
+          --runtime ${{ env.RUNTIME_IDENTIFIER }}
           --no-restore
           -p:WindowsPackageType=MSIX
           -p:GenerateAppxPackageOnBuild=true
           -p:AppxPackageSigningEnabled=false
           -p:AppxPackageDir=${{ github.workspace }}\artifacts\msix\
+          -p:PublishReadyToRun=${{ env.PUBLISH_READY_TO_RUN }}
           -p:ContinuousIntegrationBuild=true
 
       - name: Upload MSIX artifacts
